@@ -1,5 +1,5 @@
 import Link from 'next/link'
-
+import SiteNav from '@/components/SiteNav'
 const STATS = [
   { value: '18', label: 'Residential Towers' },
   { value: '532', label: 'Modern Flats' },
@@ -18,9 +18,10 @@ const HIGHLIGHTS = [
   { icon: '📍', title: 'Prime Location', desc: 'Near Dali Bai Circle, Jodhpur – 342001, Rajasthan.' },
 ]
 
-export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#020617] text-white">
+    <>
+      <SiteNav />
+      <div className="min-h-screen bg-[#020617] text-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <Link href="/" className="text-sm text-[#D4AF37]">← Back to Home</Link>
 
@@ -72,7 +73,8 @@ export default function AboutPage() {
         <p className="text-center text-xs opacity-50 mt-10 pb-6">
           © Arihant Anchal Society • Site developed by Er. Mahesh Chand – 8769909700
         </p>
-      </div>
+           </div>
     </div>
+    </>
   )
 }
