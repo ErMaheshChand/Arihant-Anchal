@@ -1,5 +1,5 @@
 import Link from 'next/link'
-
+import SiteNav from '@/components/SiteNav'
 const AMENITIES = [
   { icon: '🏊', title: 'Swimming Pool', desc: 'Crystal clear pool with kids section and lifeguard.' },
   { icon: '💪', title: 'Modern Gym', desc: 'Fully-equipped gym with trainer for residents.' },
@@ -11,8 +11,9 @@ const AMENITIES = [
   { icon: '🔌', title: 'Power Backup', desc: 'Lift & common area power backup.' },
 ]
 
-export default function AmenitiesPage() {
-  return (
+return (
+  <>
+    <SiteNav />
     <div className="min-h-screen bg-[#020617] text-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <Link href="/" className="text-sm text-[#D4AF37]">← Back to Home</Link>
@@ -37,5 +38,6 @@ export default function AmenitiesPage() {
         <p className="text-center text-xs opacity-50 mt-10">© Arihant Anchal Society • Site developed by Er. Mahesh Chand – 8769909700</p>
       </div>
     </div>
+    </>
   )
 }
