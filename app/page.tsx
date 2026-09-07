@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import ArihantApp from '@/components/ArihantApp'
+import SiteNav from '@/components/SiteNav'
+
 export default function Page() {
   return (
     <>
+      <SiteNav />
       <ArihantApp />
       <Link
         href="/3d-view"
