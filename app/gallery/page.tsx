@@ -1,50 +1,52 @@
 import Link from 'next/link'
+import SiteNav from '@/components/SiteNav'
 
 const IMAGES = [
-  { title: 'Tower Elevation', tag: 'Exterior' },
-  { title: 'Club House Interior', tag: 'Club' },
-  { title: 'Swimming Pool', tag: 'Amenities' },
-  { title: 'Landscaped Garden', tag: 'Green' },
-  { title: 'Kids Play Area', tag: 'Kids' },
-  { title: 'Gym & Fitness', tag: 'Fitness' },
-  { title: 'Lobby & Entrance', tag: 'Interior' },
-  { title: 'Parking Area', tag: 'Parking' },
+  { id: 1, title: 'Main Entrance', cat: 'Exterior' },
+  { id: 2, title: 'Club House Night View', cat: 'Club House' },
+  { id: 3, title: 'Swimming Pool', cat: 'Amenities' },
+  { id: 4, title: 'Garden & Play Area', cat: 'Garden' },
+  { id: 5, title: 'Tower Elevation', cat: 'Exterior' },
+  { id: 6, title: '3D Society View', cat: '3D View' },
 ]
 
 export default function GalleryPage() {
   return (
-    <div className="min-h-screen bg-[#020617] text-white">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Link href="/" className="text-sm text-[#D4AF37]">← Back to Home</Link>
-        
-        <h1 className="text-3xl font-bold mt-4">Gallery - <span className="text-[#D4AF37]">Arihant Anchal</span></h1>
-        <p className="opacity-70 text-sm mt-2">19 Towers A-S | 530 Flats | Premium Views</p>
+    <>
+      <SiteNav />
+      <div className="min-h-screen bg-[#020617] text-white">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <Link href="/" className="text-sm text-[#D4AF37]">← Back to Home</Link>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6">
-          {IMAGES.map(img => (
-            <div key={img.title} className="group rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-[#D4AF37]/50 transition">
-              <div className="h-32 bg-gradient-to-br from-[#D4AF37]/20 to-black/50 flex items-center justify-center text-3xl">
-                🏢
+          <h1 className="text-3xl font-bold mt-4">Gallery – <span className="text-[#D4AF37]">Arihant Anchal</span></h1>
+          <p className="opacity-70 text-sm mt-2">Real photos & 3D renders of our premium society.</p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6">
+            {IMAGES.map(img => (
+              <div key={img.id} className="group relative overflow-hidden rounded-2xl bg-white/5 border border-white/10 aspect-[4/3]">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/20 to-transparent flex items-center justify-center">
+                  <span className="text-4xl opacity-30">🏢</span>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                  <p className="text-xs opacity-60">{img.cat}</p>
+                  <p className="text-sm font-bold">{img.title}</p>
+                </div>
               </div>
-              <div className="p-3">
-                <div className="text-xs px-2 py-1 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] inline-block">{img.tag}</div>
-                <div className="font-bold text-sm mt-2">{img.title}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <div className="mt-6 p-4 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-sm">
-          <p className="opacity-80">📸 Note: Abhi placeholder images hain. Aapke asli photos (tower, flat, clubhouse) ko <code className="px-1 bg-black/30 rounded">public/gallery/</code> folder me daal kar yaha dikha sakte hain.</p>
-        </div>
+          <div className="mt-8 p-5 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30">
+            <p className="text-sm"><span className="font-bold text-[#D4AF37]">Note:</span> Abhi demo images hain. Aap real society photos `/public/gallery/` me daal sakte ho, main code se connect kar dunga.</p>
+          </div>
 
-        <div className="flex gap-3 mt-8">
-          <Link href="/3d-view" className="px-6 py-3 rounded-full font-bold bg-[#D4AF37] text-black">🏢 3D View</Link>
-          <Link href="/contact" className="px-6 py-3 rounded-full font-bold border border-[#D4AF37]/50 text-[#D4AF37]">Contact</Link>
-        </div>
+          <div className="flex gap-3 mt-8">
+            <Link href="/3d-view" className="px-6 py-3 rounded-full font-bold bg-[#D4AF37] text-black">🏢 3D View</Link>
+            <Link href="/contact" className="px-6 py-3 rounded-full font-bold border border-white/20">Contact</Link>
+          </div>
 
-        <p className="text-center text-xs opacity-50 mt-10">© Arihant Anchal Society • Site developed by Er. Mahesh Chand – 8769909700</p>
+          <p className="text-center text-xs opacity-50 mt-10">© Arihant Anchal Society • Site developed by Er. Mahesh Chand – 8769909700</p>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
