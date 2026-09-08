@@ -14,15 +14,17 @@ export default function Admin(){
     const { data } = await supabase.from('residents').select('*').order('created_at',{ascending:false})
     if(data){ setAll(data); setFiltered(data) }
   }
+
   useEffect(()=>{ load() },[])
 
   useEffect(()=>{
     let f = [...all]
     if(search){
+      const s = search.toLowerCase()
       f = f.filter(r =>
-        r.flat_no?.toLowerCase().includes(search.toLowerCase()) ||
-        r.name?.toLowerCase().includes(search.toLowerCase()) ||
-        r.mobile?.includes(search)
+        r.flat_no?.toLowerCase().includes(s) ||
+        r.name?.toLowerCase().includes(s) ||
+        r.mobile?.includes(s)
       )
     }
     if(roleFilter!=='all') f = f.filter(r=>r.role===roleFilter)
@@ -32,7 +34,8 @@ export default function Admin(){
       f = f.filter(r=> new Date(r.created_at).toDateString()===today)
     }
     if(dateFilter==='week'){
-      const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate()-7)
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate()-7)
       f = f.filter(r=> new Date(r.created_at) >= weekAgo)
     }
     setFiltered(f)
@@ -42,6 +45,7 @@ export default function Admin(){
     await supabase.from('residents').update({status:'approved', approved_at: new Date().toISOString()}).eq('id', r.id)
     load()
   }
+
   const reject = async (r:any) => {
     await supabase.from('residents').update({status:'rejected', approved_at: new Date().toISOString()}).eq('id', r.id)
     load()
@@ -53,12 +57,12 @@ export default function Admin(){
         <h1 className="text- font-bold">Arihant Anchal - Resident Listing</h1>
         <p className="text- text-black/60">Total {all.length} | Filtered {filtered.length}</p>
 
-        {/* FILTER BAR */}
         <div className="mt-4 p-3 bg-white rounded- border shadow-sm space-y-3">
           <input
             className="w-full h- rounded- bg-[#F8FAFC] border px-4 text-"
-            placeholder="🔍 Search - Flat No / Naam / Mobile"
-            value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search Flat / Name / Mobile"
+            value={search}
+            onChange={e=>setSearch(e.target.value)}
           />
           <div className="grid grid-cols-3 gap-2">
             <select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)} className="h- rounded- bg-[#F8FAFC] border px-2 text-">
@@ -80,4 +84,47 @@ export default function Admin(){
           </div>
         </div>
 
-        {/* LISTING TABLE -
+        <div className="mt-4 bg-white rounded- border shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-">
+              <thead className="bg-[#0B1120] text-white">
+                <tr>
+                  <th className="p-3 text-left">Flat</th>
+                  <th className="p-3 text-left">Name</th>
+                  <th className="p-3 text-left">Mobile</th>
+                  <th className="p-3 text-left">Role</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(r=>(
+                  <tr key={r.id} className="border-t">
+                    <td className="p-3 font-bold">{r.flat_no}</td>
+                    <td className="p-3">{r.name}</td>
+                    <td className="p-3">{r.mobile}</td>
+                    <td className="p-3">{r.role}</td>
+                    <td className="p-3">{r.status}</td>
+                    <td className="p-3 text-">{new Date(r.created_at).toLocaleDateString('en-IN')}</td>
+                    <td className="p-3">
+                      {r.status==='pending'? (
+                        <div className="flex gap-1">
+                          <button onClick={()=>approve(r)} className="px-3 py-1 bg-black text-white rounded-full text-">Approve</button>
+                          <button onClick={()=>reject(r)} className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-">Reject</button>
+                        </div>
+                      ) : (
+                        <span className="text- text-black/40">Saved</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length===0 && <div className="p-8 text-center text-black/40 text-">No records found</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
