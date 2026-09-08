@@ -8,13 +8,7 @@ export default function DailyReport() {
   useEffect(() => {
     async function load() {
       const today = new Date().toISOString().split('T')[0]
-      const { data } = await supabase
-       .from('visitors')
-       .select('*')
-       .gte('created_at', `${today}T00:00:00`)
-       .lte('created_at', `${today}T23:59:59`)
-       .order('created_at', {ascending:false})
-
+      const { data } = await supabase.from('visitors').select('*').gte('created_at', `${today}T00:00:00`).lte('created_at', `${today}T23:59:59`).order('created_at', {ascending:false})
       if(data) {
         setVisitors(data)
         setStats({
