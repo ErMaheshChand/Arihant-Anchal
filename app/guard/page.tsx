@@ -79,7 +79,7 @@ export default function GuardMobile() {
   const handleApproveAndSend = () => insertVisitor({
     visitor_name: visitor, name: visitor, mobile, vehicle_no: vehicle,
     flat_no: flat.toUpperCase(), resident_flat: flat.toUpperCase(),
-    purpose, guard_id:'Gate 1', status:'inside'
+    purpose, guard_id:'Gate 1', status:'pending'
   })
 
   const handleDelivery = () => {
@@ -88,7 +88,7 @@ export default function GuardMobile() {
       visitor_name: `${deliveryCompany} Delivery`, name: `${deliveryCompany} Delivery`,
       mobile: mobile || 'Delivery', vehicle_no: vehicle,
       flat_no: flat.toUpperCase(), resident_flat: flat.toUpperCase(),
-      purpose: `Delivery - ${deliveryCompany}`, guard_id:'Gate 1', status:'inside'
+      purpose: `Delivery - ${deliveryCompany}`, guard_id:'Gate 1', status:'pending'
     })
   }
 
@@ -98,7 +98,7 @@ export default function GuardMobile() {
       visitor_name: `${vehicleType} - ${vehicle}`, name: `${vehicleType} - ${vehicle}`,
       mobile: mobile || 'Vehicle Entry', vehicle_no: vehicle,
       flat_no: flat.toUpperCase(), resident_flat: flat.toUpperCase(),
-      purpose: `Vehicle Entry - ${vehicleType}`, guard_id:'Gate 1', status:'inside'
+      purpose: `Vehicle Entry - ${vehicleType}`, guard_id:'Gate 1', status:'pending'
     })
   }
 
