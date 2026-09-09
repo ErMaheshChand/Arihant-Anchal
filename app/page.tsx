@@ -10,7 +10,6 @@ export default function HomePage() {
   const [showLoginMenu, setShowLoginMenu] = useState(false)
   const [showGuardSub, setShowGuardSub] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [loginRole, setLoginRole] = useState('resident')
   const [loading, setLoading] = useState(false)
 
   useEffect(()=>{
@@ -37,115 +36,112 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-white">
-      {/* NAVBAR - THEME MATCH */}
-      <header className="sticky top-0 z-50 bg-[#0B1120]/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h- flex items-center justify-between">
-          {/* Logo */}
+    <div className="min-h-screen bg-[#0B1120] text-white relative">
+      {/* TOP NAVBAR - CLEAN, Resident/Login HATA DIYA */}
+      <header className="sticky top-0 z-40 bg-[#0B1120]/80 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-6 h- flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8B6F1F] flex items-center justify-center font-serif font-black text-black">A</div>
-            <div className="leading-tight hidden sm:block">
+            <div className="leading-tight">
               <div className="font-bold text- tracking-wide">Arihant Anchal</div>
               <div className="text- tracking-[0.2em] text-[#D4AF37]/70 uppercase">Society & Club House</div>
             </div>
           </div>
-
-          {/* Center Tabs - Theme Match */}
-          <nav className="hidden lg:flex items-center gap-1 p-1.5 rounded-full bg-white/[0.06] border border-white/10">
+          <nav className="hidden md:flex items-center gap-1 p-1.5 rounded-full bg-white/[0.06] border border-white/10">
             <Link href="/" className="px-5 py-2 rounded-full bg-[#D4AF37] text-black text- font-bold">Home</Link>
             <Link href="/about" className="px-4 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10">About</Link>
             <Link href="/amenities" className="px-4 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10">Amenities</Link>
             <Link href="/gallery" className="px-4 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10">Gallery</Link>
             <Link href="/contact" className="px-4 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10">Contact</Link>
           </nav>
-
-          {/* Right Side - Resident + Professional Login Tab */}
-          <div className="flex items-center gap-2">
-            {/* Resident Tab - Old Same */}
-            <div className="relative">
-              <button onClick={()=>{ setShowResidentMenu(!showResidentMenu); setShowLoginMenu(false) }} className="px-4 md:px-5 h-9 md:h-10 rounded-full bg-white text-black text- md:text- font-bold flex items-center gap-1">
-                Resident <span className="text-">{showResidentMenu?'▲':'▼'}</span>
-              </button>
-              {showResidentMenu && (
-                <div className="absolute top-12 right-0 w-60 bg-[#141E32] border border-white/10 rounded-2xl shadow-2xl p-2 z-50">
-                  <button onClick={()=>go('/register')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#D4AF37] text-black flex items-center justify-center text-xs">📝</div>
-                    <div><div className="text-sm font-bold">Registration</div><div className="text- text-white/50">New Flat Register</div></div>
-                  </button>
-                  <button onClick={()=>{ setShowResidentMenu(false); setLoginRole('resident'); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center text-xs">🔐</div>
-                    <div><div className="text-sm font-bold">Resident Login</div><div className="text- text-white/50">Flat + Password</div></div>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* PROFESSIONAL LOGIN TAB - NEW */}
-            <div className="relative">
-              <button onClick={()=>{ setShowLoginMenu(!showLoginMenu); setShowResidentMenu(false) }} className="px-4 md:px-5 h-9 md:h-10 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8960C] text-black text- md:text- font-black flex items-center gap-1.5 shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-                Login <span className="text-">{showLoginMenu?'▲':'▼'}</span>
-              </button>
-
-              {showLoginMenu && (
-                <div className="absolute top-12 right-0 w- bg-[#141E32] border border-[#D4AF37]/20 rounded- shadow-2xl p-2 z-50 overflow-hidden">
-                  <div className="px-3 py-2 text- tracking-widest text-[#D4AF37]/60 font-bold">SELECT LOGIN TYPE</div>
-
-                  {/* Resident */}
-                  <button onClick={()=>{ setShowLoginMenu(false); setLoginRole('resident'); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
-                    <div className="w-9 h-9 rounded-xl bg-white text-black flex items-center justify-center">👤</div>
-                    <div className="flex-1"><div className="text-sm font-bold">Resident Login</div><div className="text- text-white/50">Flat No + Password</div></div>
-                    <div className="text-white/20">→</div>
-                  </button>
-
-                  {/* Guard Login with Submenu */}
-                  <div className="relative">
-                    <button onClick={()=>setShowGuardSub(!showGuardSub)} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
-                      <div className="w-9 h-9 rounded-xl bg-[#D4AF37] text-black flex items-center justify-center">🛡️</div>
-                      <div className="flex-1"><div className="text-sm font-bold">Guard Login</div><div className="text- text-white/50">Gate 1 to 5 • Visitor Entry</div></div>
-                      <div className="text-white/40 text-xs">{showGuardSub?'▲':'▼'}</div>
-                    </button>
-                    {showGuardSub && (
-                      <div className="ml-4 mr-2 my-1 p-2 rounded-xl bg-black/30 border border-white/10 grid grid-cols-3 gap-2">
-                        {[1,2,3,4,5].map(n=>(
-                          <button key={n} onClick={()=>go(`/guard?gate=${n}`)} className="h-9 rounded-full bg-white/10 hover:bg-[#D4AF37] hover:text-black text-xs font-bold transition">Gate {n}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Admin */}
-                  <button onClick={()=>go('/admin')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
-                    <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center">⚙️</div>
-                    <div className="flex-1"><div className="text-sm font-bold">Admin Login</div><div className="text- text-white/50">Residents • Approval • Reports</div></div>
-                    <div className="text-white/20">→</div>
-                  </button>
-
-                  {/* Club House */}
-                  <button onClick={()=>go('/clubhouse')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">🏊</div>
-                    <div className="flex-1"><div className="text-sm font-bold">Club House Login</div><div className="text- text-white/50">Booking • Events • Members</div></div>
-                    <div className="text-white/20">→</div>
-                  </button>
-
-                  {/* Extra - Maintenance */}
-                  <button onClick={()=>go('/maintenance')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">💰</div>
-                    <div className="flex-1"><div className="text-sm font-bold">Maintenance Login</div><div className="text- text-white/50">Due • Advance • Receipts</div></div>
-                    <div className="text-white/20">→</div>
-                  </button>
-
-                  <div className="mt-2 p-2 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 text- text-[#D4AF37]/70 text-center">
-                    Theme: Dark + Gold • Auto Adjust Responsive
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <div className="w-10"></div>
         </div>
       </header>
 
-      {/* HERO - ONLY BIG STYLISH */}
-      <section className="relative min-h- flex items-center justify-center text-center px-6">
+      {/* RIGHT SIDE VERTICAL TABS */}
+      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2">
+        {/* RESIDENT VERTICAL TAB */}
+        <div className="relative">
+          <button
+            onClick={()=>{ setShowResidentMenu(!showResidentMenu); setShowLoginMenu(false) }}
+            className="w-12 md:w-14 py-4 rounded-l-2xl bg-white text-black font-black text- md:text-xs shadow-2xl flex flex-col items-center gap-1 hover:bg-[#D4AF37] transition-all border-r-0 border border-white/20"
+            style={{writingMode:'vertical-rl', textOrientation:'mixed'}}
+          >
+            <span className="text-lg">👤</span>
+            <span className="tracking-widest">RESIDENT</span>
+          </button>
+
+          {showResidentMenu && (
+            <div className="absolute right- md:right- top-0 w-64 bg-[#141E32] border border-[#D4AF37]/20 rounded-2xl shadow-2xl p-2 z-50">
+              <div className="px-3 py-2 text- tracking-widest text-[#D4AF37]/60 font-bold">RESIDENT ACCESS</div>
+              <button onClick={()=>go('/register')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-[#D4AF37] text-black flex items-center justify-center text-xs">📝</div>
+                <div><div className="text-sm font-bold">Registration</div><div className="text- text-white/50">New Flat Register</div></div>
+              </button>
+              <button onClick={()=>{ setShowResidentMenu(false); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center text-xs">🔐</div>
+                <div><div className="text-sm font-bold">Resident Login</div><div className="text- text-white/50">Flat + Password</div></div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* LOGIN VERTICAL TAB */}
+        <div className="relative">
+          <button
+            onClick={()=>{ setShowLoginMenu(!showLoginMenu); setShowResidentMenu(false) }}
+            className="w-12 md:w-14 py-4 rounded-l-2xl bg-gradient-to-b from-[#D4AF37] to-[#8B6F1F] text-black font-black text- md:text-xs shadow-[0_0_25px_rgba(212,175,55,0.4)] flex flex-col items-center gap-1 hover:brightness-110 transition-all border border-[#D4AF37]/30"
+            style={{writingMode:'vertical-rl', textOrientation:'mixed'}}
+          >
+            <span className="text-lg">🔑</span>
+            <span className="tracking-widest">LOGIN</span>
+          </button>
+
+          {showLoginMenu && (
+            <div className="absolute right- md:right- top-0 w- bg-[#141E32] border border-[#D4AF37]/20 rounded- shadow-2xl p-2 z-50 max-h- overflow-auto">
+              <div className="px-3 py-2 text- tracking-widest text-[#D4AF37]/60 font-bold">SELECT LOGIN TYPE</div>
+
+              <button onClick={()=>{ setShowLoginMenu(false); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white text-black flex items-center justify-center">👤</div>
+                <div className="flex-1"><div className="text-sm font-bold">Resident Login</div><div className="text- text-white/50">Flat No + Password</div></div>
+              </button>
+
+              <div>
+                <button onClick={()=>setShowGuardSub(!showGuardSub)} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#D4AF37] text-black flex items-center justify-center">🛡️</div>
+                  <div className="flex-1"><div className="text-sm font-bold">Guard Login</div><div className="text- text-white/50">Gate 1-5</div></div>
+                  <div className="text-xs">{showGuardSub?'▲':'▼'}</div>
+                </button>
+                {showGuardSub && (
+                  <div className="mx-2 my-1 p-2 rounded-xl bg-black/30 border border-white/10 grid grid-cols-3 gap-2">
+                    {[1,2,3,4,5].map(n=>(
+                      <button key={n} onClick={()=>go(`/guard?gate=${n}`)} className="h-9 rounded-full bg-white/10 hover:bg-[#D4AF37] hover:text-black text-xs font-bold">Gate {n}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={()=>go('/admin')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center">⚙️</div>
+                <div><div className="text-sm font-bold">Admin Login</div><div className="text- text-white/50">Approval • Reports</div></div>
+              </button>
+
+              <button onClick={()=>go('/clubhouse')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">🏊</div>
+                <div><div className="text-sm font-bold">Club House</div><div className="text- text-white/50">Booking • Events</div></div>
+              </button>
+
+              <button onClick={()=>go('/maintenance')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">💰</div>
+                <div><div className="text-sm font-bold">Maintenance</div><div className="text- text-white/50">Due • Advance</div></div>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* HERO - ONLY BIG STYLISH WELCOME */}
+      <section className="relative min-h- flex items-center justify-center text-center px-6 pr-">
         <div className="absolute inset-0 bg-gradient-to-br from-[#0B1120] via-[#121E35] to-[#0B1120]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.18),_transparent_65%)]" />
         <div className="relative z-10 max-w-5xl">
@@ -158,12 +154,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* RESIDENT LOGIN MODAL */}
+      {/* LOGIN MODAL */}
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-[#141E32] border border-white/10 text-white rounded- p-6 shadow-2xl">
             <div className="flex justify-between items-center">
-              <div className="font-bold text-lg">🔐 {loginRole.toUpperCase()} Login</div>
+              <div className="font-bold text-lg">🔐 Resident Login</div>
               <button onClick={()=>setShowLoginModal(false)} className="w-8 h-8 rounded-full bg-white/10">✕</button>
             </div>
             <div className="mt-6 space-y-3">
