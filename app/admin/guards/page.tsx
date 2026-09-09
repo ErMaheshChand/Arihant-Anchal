@@ -1,94 +1,81 @@
 'use client'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
-type Guard = { id:string, guard_id:string, name:string, mobile:string, gate_no:number, shift:string, salary_per_day:number, photo_url:string, id_proof_url:string, status:string, created_at:string }
+export default function GuardEntryPage(){
+  const [guards,setGuards]=useState<any[]>([])
+  const [search,setSearch]=useState('')
+  const [status,setStatus]=useState('all')
 
-export default function AdminGuards(){
-  const [guards,setGuards]=useState<Guard[]>([])
-  const [filter,setFilter]=useState<'pending'|'approved'|'all'>('pending')
-  const [loading,setLoading]=useState(true)
-
-  const fetchGuards=async()=>{
-    setLoading(true)
-    let q = supabase.from('guards').select('*').order('created_at',{ascending:false})
-    if(filter!=='all') q = q.eq('status',filter)
-    const { data } = await q
-    setGuards((data as any)||[])
-    setLoading(false)
+  useEffect(()=>{ fetchData() },[])
+  const fetchData=async()=>{
+    const { data } = await supabase.from('guards').select('*').order('created_at',{ascending:false})
+    setGuards(data||[])
   }
-  useEffect(()=>{fetchGuards()},[filter])
-
-  const updateStatus=async(id:string,status:'approved'|'rejected')=>{
-    // Approve time par bhi 3 per gate check
-    const guard = guards.find(g=>g.id===id)
-    if(status==='approved' && guard){
-      const { data: countData } = await supabase.from('guards').select('id').eq('gate_no',guard.gate_no).eq('status','approved')
-      if(countData && countData.length>=3){
-        alert(`❌ Gate ${guard.gate_no} par already 3 approved guards hain.`)
-        return
-      }
-    }
-    const { error } = await supabase.from('guards').update({status}).eq('id',id)
-    if(!error) fetchGuards()
-  }
-
-  const gateCount = (gateNo:number)=> guards.filter(g=>g.gate_no===gateNo && g.status!=='rejected').length
-  const approvedCount = (gateNo:number)=> guards.filter(g=>g.gate_no===gateNo && g.status==='approved').length
+  const filtered = guards.filter(g=>{
+    const s = search.toLowerCase()
+    const match =!s || g.name.toLowerCase().includes(s) || g.mobile.includes(s) || g.guard_id.toLowerCase().includes(s)
+    const statusMatch = status==='all' || g.status===status
+    return match && statusMatch
+  })
+  const total = guards.length
+  const pending = guards.filter(g=>g.status==='pending').length
+  const inside = guards.filter(g=>g.status==='approved').length
+  const exited = guards.filter(g=>g.status==='rejected').length
 
   return(
-    <div className="min-h-screen bg-[#0A0E1A] text-white">
-      <header className="max-w-7xl mx-auto px-6 h- flex items-center justify-between border-b border-white/10">
-        <Link href="/admin" className="text-[#D4AF37] text-sm">← Admin Dashboard</Link>
-        <div className="font-bold">Guard Approval <span className="text-white/40 font-normal text-sm">(3 per Gate Locked)</span></div>
-        <Link href="/" className="text-xs bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">Home</Link>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Gate Stats */}
-        <div className="grid grid-cols-5 gap-3">
-          {[1,2,3,4,5].map(gate=>(
-            <div key={gate} className="bg-[#151A27] border border-white/10 rounded-2xl p-4">
-              <div className="text- text-white/40 tracking-widest">GATE {gate}</div>
-              <div className="mt-1 text- font-bold">{guards.filter(g=>g.gate_no===gate && g.status==='approved').length}/3 <span className="text-white/30 text-sm font-normal">Approved</span></div>
-              <div className="mt-1 text- text-white/30">{guards.filter(g=>g.gate_no===gate).length} total (pending+approved)</div>
-              <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-[#D4AF37]" style={{width:`${(guards.filter(g=>g.gate_no===gate && g.status==='approved').length/3)*100}%`}}></div></div>
+    <div className="min-h-screen bg-[#F6F7FB] p-4">
+      {/* FIXED DASHBOARD */}
+      <div className="sticky top-0 z-20 bg-[#F6F7FB] pb-3">
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            {l:'TOTAL',v:total,bg:'bg-white'},
+            {l:'PENDING',v:pending,bg:'bg-[#FFFBEB]'},
+            {l:'INSIDE',v:inside,bg:'bg-[#ECFDF5]'},
+            {l:'EXITED',v:exited,bg:'bg-[#F5F5F5]'},
+          ].map(c=>(
+            <div key={c.l} className={`${c.bg} rounded- border border-black/5 p-4`}>
+              <div className="text- tracking-widest text-black/40">{c.l}</div>
+              <div className="text- font-black mt-1">{c.v}</div>
             </div>
           ))}
         </div>
-
-        {/* Filter */}
-        <div className="mt-6 flex gap-2">
-          {(['pending','approved','all'] as const).map(f=>(
-            <button key={f} onClick={()=>setFilter(f)} className={`px-4 h-9 rounded-full text-xs font-bold capitalize border ${filter===f?'bg-[#D4AF37] text-black border-[#D4AF37]':'bg-white/5 border-white/10 text-white/60'}`}>{f}</button>
-          ))}
-          <button onClick={fetchGuards} className="ml-auto px-4 h-9 rounded-full text-xs bg-white/5 border border-white/10">Refresh</button>
+        <div className="mt-3 bg-white rounded- border p-3 flex gap-2 flex-wrap shadow-sm">
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search Name/Flat/Mobile/Vehicle" className="flex-1 min-w- h-10 rounded-full bg-black/5 px-4 text-sm outline-none"/>
+          <select value={status} onChange={e=>setStatus(e.target.value)} className="h-10 rounded-full bg-black/5 px-4 text-sm">
+            <option value="all">All Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option>
+          </select>
+          <button className="h-10 px-5 rounded-full bg-[#FDE68A] text-sm font-bold">Apply</button>
+          <button className="h-10 px-5 rounded-full bg-black text-white text-sm font-bold">CSV</button>
         </div>
+        <div className="mt-3 bg-[#EFF6FF] border border-blue-100 rounded-full px-4 py-2 flex justify-between items-center">
+          <span className="text- font-bold text-blue-900">➕ Sirf ye list scroll hogi • Dashboard fix hai</span>
+          <span className="text- bg-white border px-2 py-1 rounded-full">{filtered.length} rows</span>
+        </div>
+      </div>
 
-        {/* List */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading? <div className="text-white/40 text-sm">Loading...</div> : guards.length===0? <div className="text-white/40 text-sm">No guards found</div> :
-          guards.map(g=>(
-            <div key={g.id} className="bg-[#151A27] border border-white/10 rounded- p-4 flex gap-4">
-              <img src={g.photo_url} alt="" className="w- h- rounded-2xl object-cover bg-white/5"/>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm">{g.name}</span>
-                  <span className={`text- px-2 py-0.5 rounded-full ${g.status==='approved'?'bg-green-500/20 text-green-300':g.status==='pending'?'bg-[#D4AF37]/20 text-[#D4AF37]':'bg-red-500/20 text-red-300'}`}>{g.status}</span>
-                </div>
-                <div className="text- text-white/50 mt-1">{g.guard_id} • {g.mobile} • Gate {g.gate_no} • {g.shift} • ₹{g.salary_per_day}/day</div>
-                <div className="flex gap-2 mt-3">
-                  <a href={g.id_proof_url} target="_blank" className="text- bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">ID Proof</a>
-                  {g.status==='pending' && <>
-                    <button onClick={()=>updateStatus(g.id,'approved')} className="text- bg-[#D4AF37] text-black font-bold px-3 py-1.5 rounded-full">Approve</button>
-                    <button onClick={()=>updateStatus(g.id,'rejected')} className="text- bg-red-500/20 text-red-300 border border-red-500/20 px-3 py-1.5 rounded-full">Reject</button>
-                  </>}
-                  {g.status==='approved' && <button onClick={()=>updateStatus(g.id,'rejected')} className="text- bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">Revoke</button>}
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* SCROLL ONLY LIST */}
+      <div className="mt-3 bg-white rounded- border overflow-hidden shadow-sm">
+        <div className="overflow-auto max-h- custom-scroll">
+          <table className="w-full text-">
+            <thead className="sticky top-0 bg-[#0F172A] text-white">
+              <tr className="text-left">
+                <th className="p-3">Date/Time</th><th className="p-3">Photo</th><th className="p-3">Visitor + Mobile</th><th className="p-3">Flat</th><th className="p-3">Status</th><th className="p-3">Entry / Exit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(g=>(
+                <tr key={g.id} className="border-t hover:bg-black/5">
+                  <td className="p-3"><div className="font-bold">{new Date(g.created_at).toLocaleDateString()}</div><div className="text-black/40 text-">Gate {g.gate_no}</div></td>
+                  <td className="p-3"><img src={g.photo_url||'https://i.pravatar.cc/100'} className="w-9 h-9 rounded-xl object-cover"/></td>
+                  <td className="p-3"><div className="font-bold uppercase">{g.name}</div><div className="text-black/40 text-">{g.mobile}</div></td>
+                  <td className="p-3 font-bold">Gate {g.gate_no}</td>
+                  <td className="p-3"><span className={`px-2.5 py-1 rounded-full text- font-bold ${g.status==='approved'?'bg-[#D1FAE5] text-[#065F46]':g.status==='pending'?'bg-[#FEF3C7] text-[#92400E]':'bg-gray-200'}`}>{g.status}</span></td>
+                  <td className="p-3 text-">ID: {g.guard_id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
