@@ -6,20 +6,25 @@ import { supabase } from '@/lib/supabase'
 export default function HomePage() {
   const [flatNo, setFlatNo] = useState('')
   const [password, setPassword] = useState('')
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [showGuard, setShowGuard] = useState(false)
+  const [showResidentMenu, setShowResidentMenu] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(()=>{
     const p=new URLSearchParams(window.location.search).get('flat')
-    if(p){ setFlatNo(p); setShowLoginModal(true) }
+    if(p){ setFlatNo(p); setShowLogin(true) }
+    // AUTO REDIRECT HATA DIYA - ab landing page par hi rahega
   },[])
 
   const handleLogin = async ()=>{
     if(!flatNo||!password) return alert('Flat + Password bharo')
     setLoading(true)
     const { data: ok } = await supabase.from('residents').select('*').eq('flat_no',flatNo.toUpperCase()).eq('password',password).eq('status','approved').maybeSingle()
-    if(ok){ localStorage.setItem('resident', JSON.stringify(ok)); window.location.href='/resident'; return }
+    if(ok){
+      localStorage.setItem('resident', JSON.stringify(ok));
+      window.location.href='/resident';
+      return
+    }
     const { data: anyData } = await supabase.from('residents').select('*').eq('flat_no',flatNo.toUpperCase()).maybeSingle()
     setLoading(false)
     if(!anyData) alert('❌ Registration nahi mila')
@@ -28,121 +33,82 @@ export default function HomePage() {
     else alert('Login fail')
   }
 
-  const go = (path:string)=> window.location.href=path
-
-  const CardStyle = "bg-white rounded- border border-black/5 shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-4 min-w- cursor-pointer hover:shadow-[0_12px_40px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all"
+  const handleLogoutAndStay = ()=>{
+    localStorage.removeItem('resident')
+    alert('Logged out — Ab landing page par hi rahoge')
+    window.location.href='/'
+  }
 
   return (
-    <div className="min-h-screen bg-[#F6F6F7] text-black relative overflow-hidden">
-      {/* TOP NAVBAR - CLEAN LIGHT */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-black/5">
+    <div className="min-h-screen bg-[#0B1120] text-white">
+      <header className="sticky top-0 z-50 bg-[#0B1120]/80 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 h- flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center font-bold">A</div>
-            <div className="font-bold text-">Arihant Anchal</div>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#8B6F1F] flex items-center justify-center font-serif font-black text-black text-lg">A</div>
+            <div className="leading-tight">
+              <div className="font-bold text- tracking-wide">Arihant Anchal</div>
+              <div className="text- tracking-[0.2em] text-[#D4AF37]/70 uppercase">Society & Club House</div>
+            </div>
           </div>
-          <nav className="hidden md:flex items-center gap-6 text- font-medium text-black/60">
-            <Link href="/" className="text-black font-bold">Home</Link>
-            <Link href="/about">About</Link>
-            <Link href="/amenities">Amenities</Link>
-            <Link href="/gallery">Gallery</Link>
-            <Link href="/contact">Contact</Link>
+
+          <nav className="hidden lg:flex items-center gap-1 p-1.5 rounded-full bg-white/[0.06] border border-white/10 backdrop-blur">
+            <Link href="/" className="px-5 py-2 rounded-full bg-[#D4AF37] text-black text- font-bold">Home</Link>
+            <Link href="/about" className="px-5 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10 transition">About</Link>
+            <Link href="/amenities" className="px-5 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10 transition">Amenities</Link>
+            <Link href="/gallery" className="px-5 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10 transition">Gallery</Link>
+            <Link href="/contact" className="px-5 py-2 rounded-full text- text-white/70 hover:text-white hover:bg-white/10 transition">Contact</Link>
+            <div className="relative ml-2">
+              <button onClick={()=>setShowResidentMenu(!showResidentMenu)} className="px-5 py-2 rounded-full bg-white text-black text- font-bold flex items-center gap-1.5">
+                Resident <span className="text-">{showResidentMenu?'▲':'▼'}</span>
+              </button>
+              {showResidentMenu && (
+                <div className="absolute top-12 right-0 w-60 bg-[#141E32] border border-white/10 rounded-2xl shadow-2xl p-2 z-50">
+                  <button onClick={()=>{ setShowResidentMenu(false); window.location.href='/register' }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#D4AF37] text-black flex items-center justify-center text-xs">📝</div>
+                    <div><div className="text-sm font-bold">Registration</div><div className="text- text-white/50">New Flat</div></div>
+                  </button>
+                  <button onClick={()=>{ setShowResidentMenu(false); setShowLogin(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center text-xs">🔐</div>
+                    <div><div className="text-sm font-bold">Login</div><div className="text- text-white/50">Flat + Password</div></div>
+                  </button>
+                  <button onClick={handleLogoutAndStay} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border-t border-white/10 mt-1">
+                    <div className="text-sm font-bold text-red-400">Logout & Stay Here</div>
+                  </button>
+                </div>
+              )}
+            </div>
           </nav>
-          <div className="w-6"></div>
+
+          <button onClick={()=>setShowResidentMenu(!showResidentMenu)} className="lg:hidden px-4 h-9 rounded-full bg-[#D4AF37] text-black text-xs font-bold">Resident</button>
         </div>
       </header>
 
-      {/* RIGHT SIDE - IMAGE STYLE CARDS - PROFESSIONAL AUTO-ADJUST */}
-      <div className="fixed right-3 md:right-5 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-3">
-
-        {/* RESIDENT - Gold */}
-        <div onClick={()=>setShowLoginModal(true)} className={CardStyle}>
-          <div className="text- tracking-widest text-black/40 font-bold">RESIDENT</div>
-          <div className="text- font-black mt-1">Login</div>
-          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full w-full bg-[#D4AF37]"></div>
-          </div>
-        </div>
-
-        {/* GUARD LOGIN */}
-        <div className={CardStyle} onClick={()=>setShowGuard(!showGuard)}>
-          <div className="text- tracking-widest text-black/40 font-bold">GUARD LOGIN</div>
-          <div className="text- font-black mt-1">Gate 1-5</div>
-          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full w-3/4 bg-black"></div>
-          </div>
-        </div>
-
-        {showGuard && (
-          <div className="bg-white rounded- border shadow-xl p-2 grid grid-cols-2 gap-2 animate-in">
-            {[1,2,3,4,5].map(n=>(
-              <button key={n} onClick={()=>go(`/guard?gate=${n}`)} className="h-10 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-[#D4AF37] hover:text-black">Gate {n}</button>
-            ))}
-          </div>
-        )}
-
-        {/* ADMIN */}
-        <div onClick={()=>go('/admin')} className={CardStyle}>
-          <div className="text- tracking-widest text-black/40 font-bold">ADMIN</div>
-          <div className="text- font-black mt-1">Login</div>
-          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full w-2/3 bg-[#FF3B30]"></div>
-          </div>
-        </div>
-
-        {/* CLUB HOUSE */}
-        <div onClick={()=>go('/clubhouse')} className={CardStyle}>
-          <div className="text- tracking-widest text-black/40 font-bold">CLUB HOUSE</div>
-          <div className="text- font-black mt-1">Login</div>
-          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full w-3/4 bg-emerald-500"></div>
-          </div>
-        </div>
-
-        {/* MAINTENANCE */}
-        <div onClick={()=>go('/maintenance')} className={CardStyle}>
-          <div className="text- tracking-widest text-black/40 font-bold">MAINTENANCE</div>
-          <div className="text- font-black mt-1">Login</div>
-          <div className="mt-3 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full w-1/2 bg-blue-500"></div>
-          </div>
-        </div>
-
-        {/* REGISTRATION - Extra Gold */}
-        <div onClick={()=>go('/register')} className={`${CardStyle} bg-[#0B1120] text-white border-white/10`}>
-          <div className="text- tracking-widest text-[#D4AF37]/70 font-bold">NEW RESIDENT</div>
-          <div className="text- font-black mt-1 text-white">Registration</div>
-          <div className="mt-3 h-1 w-full bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full w-full bg-[#D4AF37]"></div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* CENTER HERO - BIG STYLISH */}
-      <section className="relative min-h- flex items-center justify-center text-center px-6 pr-">
-        <div className="max-w-5xl">
+      <section className="relative min-h- flex items-center justify-center text-center px-6">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0B1120] via-[#121E35] to-[#0B1120]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.18),_transparent_65%)]" />
+        <div className="relative z-10 max-w-5xl">
           <h1 className="font-serif font-black tracking-tight leading-[0.85]">
-            <span className="block font-sans font-light text-black/40 text- md:text- tracking-[0.4em] uppercase mb-6">Welcome to</span>
-            <span className="block text-black text- md:text- lg:text-">Arihant Anchal</span>
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#8B6F1F] via-[#D4AF37] to-[#8B6F1F] text- md:text- lg:text- mt-3 font-light italic">Society & Club House</span>
+            <span className="block font-sans font-light text-white/50 text- md:text- tracking-[0.4em] uppercase mb-6">Welcome to</span>
+            <span className="block text-white text- md:text- lg:text-">Arihant Anchal</span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F5E6A3] to-[#D4AF37] text- md:text- lg:text- mt-3 font-light italic">Society & Club House</span>
           </h1>
+          <div className="mt-10 w-24 h- bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent mx-auto opacity-60"></div>
+          <div className="mt-6 text- text-white/30">Landing page - Auto redirect OFF</div>
         </div>
       </section>
 
-      {/* LOGIN MODAL */}
-      {showLoginModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white text-black rounded- p-6 shadow-2xl border">
+      {showLogin && (
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#141E32] border border-white/10 text-white rounded- p-6 shadow-2xl">
             <div className="flex justify-between items-center">
-              <div className="font-black text-lg">🔐 Resident Login</div>
-              <button onClick={()=>setShowLoginModal(false)} className="w-8 h-8 rounded-full bg-slate-100">✕</button>
+              <div className="font-bold text-lg">🔐 Resident Login</div>
+              <button onClick={()=>setShowLogin(false)} className="w-8 h-8 rounded-full bg-white/10">✕</button>
             </div>
             <div className="mt-6 space-y-3">
-              <input value={flatNo} onChange={e=>setFlatNo(e.target.value.toUpperCase())} placeholder="Flat No ex: B-302" className="w-full h-12 rounded-2xl bg-slate-50 border px-4 font-bold text-sm"/>
-              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h-12 rounded-2xl bg-slate-50 border px-4 font-bold text-sm"/>
-              <button onClick={handleLogin} disabled={loading} className="w-full h-12 rounded-full bg-black text-white font-bold text-sm">{loading?'Checking...':'Login → Resident'}</button>
-              <div className="text-center text-xs text-slate-400">New ho? <Link href="/register" className="text-black font-bold underline">Registration karo</Link></div>
+              <input value={flatNo} onChange={e=>setFlatNo(e.target.value.toUpperCase())} placeholder="Flat No ex: B-302" className="w-full h-12 rounded-2xl bg-white/10 border border-white/10 px-4 font-bold text-sm placeholder:text-white/40"/>
+              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h-12 rounded-2xl bg-white/10 border border-white/10 px-4 font-bold text-sm placeholder:text-white/40"/>
+              <button onClick={handleLogin} disabled={loading} className="w-full h-12 rounded-full bg-[#D4AF37] text-black font-bold text-sm">{loading?'Checking...':'Login → Resident Page'}</button>
+              <div className="text-center text-xs text-white/40">New ho? <Link href="/register" className="text-[#D4AF37] font-bold underline">Registration karo</Link></div>
             </div>
           </div>
         </div>
