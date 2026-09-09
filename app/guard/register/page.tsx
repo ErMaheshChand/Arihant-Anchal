@@ -1,46 +1,34 @@
 'use client'
 import { useState } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 export default function GuardRegisterPage(){
-  const [form,setForm]=useState({name:'',mobile:'',password:'',gate_no:'1',shift:'Day',salary_per_day:'500'})
+  const [form,setForm]=useState({name:'',mobile:'',password:'',gate_no:'1'})
   const [loading,setLoading]=useState(false)
 
   const submit=async()=>{
-    if(!form.name||!form.mobile||!form.password) return alert('Name/Mobile/Password bharo')
     setLoading(true)
     const guard_id='G-'+Date.now().toString().slice(-6)
     const {error}=await supabase.from('guards').insert({
       guard_id, name:form.name, mobile:form.mobile, password:form.password,
-      gate_no:parseInt(form.gate_no), shift:form.shift, salary_per_day:parseInt(form.salary_per_day), status:'pending'
+      gate_no:parseInt(form.gate_no), shift:'Day', salary_per_day:500, status:'pending'
     })
     setLoading(false)
     if(error) alert(error.message)
-    else { alert(`Guard Registered! ID: ${guard_id} - Pending Approval`); window.location.href='/guard' }
+    else alert(`Registered! ID: ${guard_id} - Pending Approval`)
   }
 
   return(
-    <div className="min-h-screen bg-[#0A0E1A] text-white p-6">
-      <Link href="/" className="text-[#D4AF37] text-sm">← Back to Home</Link>
-      <h1 className="text-2xl font-bold mt-6">Guard Registration - <span className="text-[#D4AF37]">3 per Gate</span></h1>
-      <div className="max-w-md mt-6 bg-[#151A27] border border-white/10 rounded- p-5 space-y-3">
-        <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Name" className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-sm"/>
-        <input value={form.mobile} onChange={e=>setForm({...form,mobile:e.target.value})} placeholder="Mobile 10 digit" className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-sm"/>
-        <input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Password" className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-sm"/>
-        <select value={form.gate_no} onChange={e=>setForm({...form,gate_no:e.target.value})} className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-sm">
-          <option className="text-black" value="1">Gate 1 - Main</option>
-          <option className="text-black" value="2">Gate 2</option>
-          <option className="text-black" value="3">Gate 3</option>
-          <option className="text-black" value="4">Gate 4</option>
-          <option className="text-black" value="5">Gate 5</option>
+    <div style={{minHeight:'100vh', background:'#0A0E1A', color:'white', padding:'20px'}}>
+      <h1 style={{color:'#D4AF37', fontSize:'24px', fontWeight:'bold'}}>Guard Register - 3 per Gate</h1>
+      <div style={{maxWidth:'400px', marginTop:'20px', background:'#151A27', padding:'20px', borderRadius:'16px'}}>
+        <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Name" style={{width:'100%', height:'48px', marginBottom:'10px', borderRadius:'12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', padding:'0 16px', color:'white'}}/>
+        <input value={form.mobile} onChange={e=>setForm({...form,mobile:e.target.value})} placeholder="Mobile" style={{width:'100%', height:'48px', marginBottom:'10px', borderRadius:'12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', padding:'0 16px', color:'white'}}/>
+        <input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Password" style={{width:'100%', height:'48px', marginBottom:'10px', borderRadius:'12px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', padding:'0 16px', color:'white'}}/>
+        <select value={form.gate_no} onChange={e=>setForm({...form,gate_no:e.target.value})} style={{width:'100%', height:'48px', marginBottom:'10px', borderRadius:'12px', background:'#151A27', border:'1px solid rgba(255,255,255,0.1)', padding:'0 16px', color:'white'}}>
+          <option value="1">Gate 1</option><option value="2">Gate 2</option><option value="3">Gate 3</option><option value="4">Gate 4</option><option value="5">Gate 5</option>
         </select>
-        <select value={form.shift} onChange={e=>setForm({...form,shift:e.target.value})} className="w-full h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-sm">
-          <option className="text-black" value="Day">Day</option>
-          <option className="text-black" value="Night">Night</option>
-          <option className="text-black" value="Rotational">Rotational</option>
-        </select>
-        <button onClick={submit} disabled={loading} className="w-full h-12 rounded-full bg-[#D4AF37] text-black font-bold text-sm">{loading?'Saving...':'Register Guard → Pending'}</button>
+        <button onClick={submit} disabled={loading} style={{width:'100%', height:'48px', borderRadius:'24px', background:'#D4AF37', color:'black', fontWeight:'bold'}}>{loading?'Saving...':'Register Guard'}</button>
       </div>
     </div>
   )
