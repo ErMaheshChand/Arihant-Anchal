@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
@@ -9,17 +9,37 @@ export default function ResidentApp() {
   const [pending, setPending] = useState<any[]>([])
   const [todayVisitors, setTodayVisitors] = useState<any[]>([])
   const [emergencyAlert, setEmergencyAlert] = useState<any>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(()=>{
     const saved = localStorage.getItem('flat_no') || localStorage.getItem('resident_flat') || 'B-302'
     setFlatNo(saved.toUpperCase())
+    if("Notification" in window && Notification.permission!=="granted"){
+      Notification.requestPermission()
+    }
   },[])
+
+  const triggerEmergencyAlert = (data:any)=>{
+    setEmergencyAlert(data)
+    try{
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const o = ctx.createOscillator()
+      o.frequency.value = 900
+      o.connect(ctx.destination)
+      o.start()
+      setTimeout(()=>o.stop(), 700)
+    }catch{}
+    if("vibrate" in navigator) navigator.vibrate([400,150,400,150,800])
+    audioRef.current?.play().catch(()=>{})
+    if("Notification" in window && Notification.permission==="granted"){
+      new Notification(`🚨 ${data.emergency_type} ALERT`, {body: `${data.guard_id} • ${data.message}`})
+    }
+  }
 
   useEffect(()=>{
     const load = async () => {
       const { data: pend } = await supabase.from('visitors').select('*').or(`resident_flat.eq.${flatNo},flat_no.eq.${flatNo}`).eq('status','pending').order('entry_time',{ascending:false})
       if(pend) setPending(pend)
-
       const todayStr = new Date().toISOString().split('T')[0]
       const { data: today } = await supabase.from('visitors').select('*').or(`resident_flat.eq.${flatNo},flat_no.eq.${flatNo}`).gte('entry_time', todayStr).order('entry_time',{ascending:false}).limit(20)
       if(today) setTodayVisitors(today)
@@ -47,7 +67,7 @@ export default function ResidentApp() {
    .on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{
         const data = payload.new as any
         if(data.target === 'ALL'){
-          setEmergencyAlert(data)
+          triggerEmergencyAlert(data)
         }
       }).subscribe()
 
@@ -62,6 +82,7 @@ export default function ResidentApp() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-black flex flex-col">
+      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto" />
       {emergencyAlert && (
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white border-4 border-red-600 rounded-3xl p-6 animate-pulse">
