@@ -1,4 +1,4 @@
-"use client"
+   "use client"
 import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useSearchParams, useRouter } from "next/navigation"
@@ -115,53 +115,36 @@ function GuardInner() {
     if(res) alert(`🚗 Vehicle Approval Sent`)
   }
 
-  // 🔥 UPDATED - SIRF 1 ROW BANEGI G-1-796440 SE - AUTO ALL RESIDENTS
   const handleEmergency = async () => {
     if(!emergencyNote) return alert('Emergency detail likho')
     setLoading(true)
     try{
-      // 1 row hi banegi - target ALL
       const { error } = await supabase.from('emergency_broadcasts').insert({
-        guard_id: guardId,
-        gate_no: gate,
-        emergency_type: emergencyType,
-        message: emergencyNote,
-        target: 'ALL',
-        created_at: new Date().toISOString()
+        guard_id: guardId, gate_no: gate, emergency_type: emergencyType, message: emergencyNote, target: 'ALL', created_at: new Date().toISOString()
       })
       if(error) throw error
-
-      // Record ke liye complaints me bhi
       await supabase.from('complaints').insert({
-        flat_no: 'ALL',
-        title: `🚨 EMERGENCY - ${emergencyType} - by ${guardId}`,
-        description: emergencyNote,
-        category:'Emergency',
-        priority:'high',
-        status:'open'
+        flat_no: 'ALL', title: `🚨 EMERGENCY - ${emergencyType} - by ${guardId}`, description: emergencyNote, category:'Emergency', priority:'high', status:'open'
       })
-
       alert(`🚨 Broadcast Done! Guard ${guardId} se ALL residents ko popup chala gaya`)
       setEmergencyNote('')
-    }catch(e:any){
-      alert(e.message)
-    }
+    }catch(e:any){ alert(e.message) }
     setLoading(false)
   }
 
-  const markExit = async (id:string) => {
-    await supabase.from('visitors').update({status:'exited', exit_time:new Date().toISOString()}).eq('id',id); loadVisitors()
-  }
+  const markExit = async (id:string) => { await supabase.from('visitors').update({status:'exited', exit_time:new Date().toISOString()}).eq('id',id); loadVisitors() }
+  const markInside = async (id:string) => { await supabase.from('visitors').update({status:'inside'}).eq('id',id); loadVisitors() }
 
   const insideList = allVisitors.filter(v=> v.status==='inside' || v.status==='approved')
   const pendingList = allVisitors.filter(v=> v.status==='pending')
+  const preApprovedList = allVisitors.filter(v=> v.status==='pre_approved' && (!flat || v.flat_no===flat.toUpperCase())) // NEW
 
   return (
     <div className="min-h-screen bg-slate-50 text-black flex flex-col">
       <div className="sticky top-0 z-40 bg-white/90 backdrop-blur rounded-b-3xl border-b px-4 h-14 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center font-bold">{guardId[0]}</div>
-          <div><div className="font-bold text-sm">Gate-{gate} • {guardId} • Active</div><div className="text-xs text-slate-500">{todayCount} Today • {pendingList.length} Pending • {insideList.length} Inside</div></div>
+          <div><div className="font-bold text-sm">Gate-{gate} • {guardId} • Active</div><div className="text-xs text-slate-500">{todayCount} Today • {pendingList.length} Pending • {preApprovedList.length} Pre-Approved</div></div>
         </div>
         <button onClick={()=>{localStorage.removeItem('guard_id'); router.push(`/guard/login?gate=${gate}`)}} className="px-3 py-1 rounded-full bg-black text-white text-xs font-bold">Logout</button>
       </div>
@@ -182,6 +165,22 @@ function GuardInner() {
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
             <input value={flat} onChange={e=>setFlat(e.target.value)} className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-100 pl-10 pr-3 text-sm font-bold outline-none focus:bg-amber-50 focus:border-amber-200" placeholder="Flat No ex: B-302" />
           </div>
+
+          {/* PRE-APPROVED SHOW - NEW */}
+          {flat && preApprovedList.length>0 && (
+            <div className="mt-4 p-3 rounded-2xl bg-blue-50 border-2 border-blue-200">
+              <div className="text-xs font-black text-blue-700">✅ RESIDENT PRE-APPROVED ({preApprovedList.length})</div>
+              <div className="mt-2 space-y-2">
+                {preApprovedList.map(v=>(
+                  <div key={v.id} className="p-2.5 rounded-xl bg-white border flex justify-between items-center">
+                    <div className="text-sm font-bold">👤 {v.visitor_name} • {v.mobile} <div className="text- text-blue-600">Resident ne pehle se approve kiya hai</div></div>
+                    <button onClick={()=>markInside(v.id)} className="px-3 py-1.5 rounded-full bg-blue-600 text-white text-xs font-bold">Allow Inside →</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {flat && (
             <div className={`mt-3 p-3 rounded-2xl border flex gap-2.5 items-center ${resident?'bg-emerald-50 border-emerald-100':'bg-red-50 border-red-100'}`}>
               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-bold ${resident?'bg-emerald-600 text-white':'bg-red-500 text-white'}`}>{resident? resident.name[0] : '!'}</div>
@@ -220,8 +219,12 @@ function GuardInner() {
 
         {tab==='approved' && (
           <div className="mt-4 p-5 rounded-3xl bg-white border shadow-sm">
-            <div className="text-sm font-bold">Pending + Inside</div>
-            <div className="mt-3 space-y-2">{pendingList.map(v=>(<div key={v.id} className="p-3 rounded-2xl bg-amber-50 border flex justify-between"><span className="text-sm font-bold">⏳ {v.visitor_name} → {v.flat_no}</span><span className="text-xs bg-amber-200 px-2 py-1 rounded-full">PENDING</span></div>))}{insideList.map(v=>(<div key={v.id} className="p-3 rounded-2xl bg-emerald-50 border flex justify-between"><span className="text-sm font-bold">✅ {v.visitor_name} → {v.flat_no}</span><button onClick={()=>markExit(v.id)} className="px-3 py-1 rounded-full bg-black text-white text-xs">Exit</button></div>))}</div>
+            <div className="text-sm font-bold">Pending + Pre-Approved + Inside</div>
+            <div className="mt-3 space-y-2">
+              {preApprovedList.map(v=>(<div key={v.id} className="p-3 rounded-2xl bg-blue-50 border-2 border-blue-200 flex justify-between"><span className="text-sm font-bold">✅ {v.visitor_name} → {v.flat_no} (Pre-Approved)</span><button onClick={()=>markInside(v.id)} className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs">Inside</button></div>))}
+              {pendingList.map(v=>(<div key={v.id} className="p-3 rounded-2xl bg-amber-50 border flex justify-between"><span className="text-sm font-bold">⏳ {v.visitor_name} → {v.flat_no}</span><span className="text-xs bg-amber-200 px-2 py-1 rounded-full">PENDING</span></div>))}
+              {insideList.map(v=>(<div key={v.id} className="p-3 rounded-2xl bg-emerald-50 border flex justify-between"><span className="text-sm font-bold">✅ {v.visitor_name} → {v.flat_no}</span><button onClick={()=>markExit(v.id)} className="px-3 py-1 rounded-full bg-black text-white text-xs">Exit</button></div>))}
+            </div>
           </div>
         )}
         {tab==='exit' && (
