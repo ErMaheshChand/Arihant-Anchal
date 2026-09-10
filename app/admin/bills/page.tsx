@@ -15,31 +15,29 @@ export default function AdminBillsPage(){
 
   const loadFlats = async ()=>{
     const { data } = await supabase.from('residents').select('*').order('flat_no')
-    if(data) { setFlats(data); if(data[0]) setSelectedFlat(data[0].flat_no) }
-    // agar residents table empty hai to bills se flat list nikalo
-    if(!data || data.length===0){
+    if(data && data.length>0) {
+      setFlats(data);
+      if(data[0]) setSelectedFlat(data[0].flat_no)
+    } else {
       const { data: b } = await supabase.from('bills').select('flat_no').order('flat_no')
-      const uniq = [...new Set((b||[]).map(x=>x.flat_no))]
+      const uniq = Array.from(new Set((b||[]).map((x:any)=>x.flat_no))) as string[]
       setFlats(uniq.map(f=>({flat_no:f, name:'Resident', mobile:'-'})))
-      if(uniq[0]) setSelectedFlat(uniq[0] as string)
+      if(uniq[0]) setSelectedFlat(uniq[0])
     }
   }
 
   const loadData = async ()=>{
     if(!selectedFlat) return
-    // Resident info
     const { data: res } = await supabase.from('residents').select('*').eq('flat_no', selectedFlat).single()
     if(res) setResident(res)
     else setResident({flat_no:selectedFlat, name:'Resident '+selectedFlat, mobile:'-', email:'-', tower:selectedFlat.split('-')[0], owner_type:'Owner'})
 
-    // Bills with date filter
     let q = supabase.from('bills').select('*').eq('flat_no', selectedFlat).order('due_date',{ascending:false})
     if(fromDate) q = q.gte('due_date', fromDate)
     if(toDate) q = q.lte('due_date', toDate)
     const { data: b } = await q
     if(b) setBills(b)
 
-    // Ledger
     const { data: l } = await supabase.from('society_ledger').select('*').eq('flat_no', selectedFlat).order('created_at',{ascending:false})
     if(l) setLedger(l)
   }
@@ -65,7 +63,6 @@ export default function AdminBillsPage(){
   const totalDue = pending.reduce((s,b)=>s+Number(b.amount),0)
   const totalPaid = paid.reduce((s,b)=>s+Number(b.amount),0)
   const totalCollection = ledger.filter(l=>l.type==='credit').reduce((s,l)=>s+Number(l.amount),0)
-
   const filteredFlats = flats.filter(f=> f.flat_no.toLowerCase().includes(searchFlat.toLowerCase()))
 
   return (
@@ -73,7 +70,6 @@ export default function AdminBillsPage(){
       <div className="max-w-6xl mx-auto">
         <h1 className="text-xl font-black">Admin - Resident Bills & Ledger</h1>
 
-        {/* Top Search + Add Bill */}
         <div className="mt-4 grid md:grid-cols-3 gap-3">
           <div className="p-4 rounded-2xl bg-white border">
             <div className="text-xs font-bold">Search Flat</div>
@@ -102,7 +98,6 @@ export default function AdminBillsPage(){
           </div>
         </div>
 
-        {/* Resident Registration Info */}
         {resident && (
           <div className="mt-4 p-5 rounded-3xl bg-white border">
             <div className="flex justify-between items-center">
@@ -119,8 +114,6 @@ export default function AdminBillsPage(){
               <div className="p-3 rounded-2xl bg-emerald-600 text-white"><div className="opacity-80">Total Paid</div><div className="font-bold text-sm">₹{totalPaid}</div></div>
               <div className="p-3 rounded-2xl bg-amber-400 text-black"><div className="opacity-70">Ledger Collection</div><div className="font-bold text-sm">₹{totalCollection}</div></div>
             </div>
-
-            {/* Due Breakdown */}
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div className="p-3 rounded-2xl bg-white border-2 border-slate-900"><div className="opacity-60">Monthly Due</div><div className="font-black text-sm">₹{pending.filter(b=>b.type==='monthly').reduce((s,b)=>s+Number(b.amount),0)}</div></div>
               <div className="p-3 rounded-2xl bg-white border-2 border-amber-300"><div className="opacity-60">Old Due</div><div className="font-black text-sm">₹{pending.filter(b=>b.type==='old_due').reduce((s,b)=>s+Number(b.amount),0)}</div></div>
@@ -129,7 +122,6 @@ export default function AdminBillsPage(){
           </div>
         )}
 
-        {/* Scroll Table with From-To Search */}
         <div className="mt-6 p-4 rounded-3xl bg-white border">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-bold text-sm">Complete Bills + Ledger - Scroll Table with Date Search</h3>
