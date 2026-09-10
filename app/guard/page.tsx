@@ -8,23 +8,7 @@ function GuardInner() {
   const gate = searchParams?.get('gate') || '1'
   const router = useRouter()
 
-  // --- Attendance check ---
-  const [guardId, setGuardId] = useState<string|null>(null)
-  const [todayAtt, setTodayAtt] = useState<any>(null)
-  const [checking, setChecking] = useState(true)
-
-  useEffect(()=>{
-    const gid = localStorage.getItem('guard_id')
-    if(!gid){ router.push(`/guard/login?gate=${gate}`); return }
-    setGuardId(gid)
-    const check = async()=>{
-      const {data} = await supabase.from('guard_attendance').select('*').eq('guard_id', gid).gte('login_time', new Date().toISOString().split('T')[0]).order('login_time',{ascending:false}).limit(1).maybeSingle()
-      if(!data){ router.push(`/guard/login?gate=${gate}`); return }
-      setTodayAtt(data); setChecking(false)
-    }
-    check()
-  },[gate, router])
-
+  const [guardId, setGuardId] = useState<string>("G-001")
   const [flat, setFlat] = useState('')
   const [resident, setResident] = useState<any>(null)
   const [visitor, setVisitor] = useState('')
@@ -51,6 +35,11 @@ function GuardInner() {
     {label:'MANAGER', number:'9876543210', icon:'👨💼'},
   ])
 
+  useEffect(()=>{
+    const gid = localStorage.getItem('guard_id') || searchParams?.get('guard_id') || "G-001"
+    setGuardId(gid)
+  },[searchParams])
+
   const loadVisitors = async () => {
     const { data } = await supabase.from('visitors').select('*').order('created_at',{ascending:false}).limit(200)
     if(data){
@@ -61,7 +50,6 @@ function GuardInner() {
   }
 
   useEffect(()=>{
-    if(checking) return
     loadVisitors()
     const ch = supabase.channel('guard-all').on('postgres_changes',{event:'*', schema:'public', table:'visitors'},()=>loadVisitors()).subscribe()
     const loadContacts = async () => {
@@ -70,7 +58,7 @@ function GuardInner() {
     }
     loadContacts()
     return ()=>{ supabase.removeChannel(ch) }
-  }, [checking])
+  }, [])
 
   useEffect(()=>{
     if(flat.length < 2){ setResident(null); return }
@@ -97,7 +85,7 @@ function GuardInner() {
       photoUrl = data.publicUrl
     }
     const { data, error } = await supabase.from('visitors').insert({
-  ...payload, photo_url: photoUrl, entry_time: new Date().toISOString(), created_at: new Date().toISOString()
+ ...payload, photo_url: photoUrl, entry_time: new Date().toISOString(), created_at: new Date().toISOString()
     }).select().single()
     setLoading(false)
     if(!error && data){
@@ -141,14 +129,12 @@ function GuardInner() {
   const insideList = allVisitors.filter(v=> v.status==='inside' || v.status==='approved')
   const pendingList = allVisitors.filter(v=> v.status==='pending')
 
-  if(checking) return <div className="min-h-screen flex items-center justify-center font-black">Checking Guard Login...</div>
-
   return (
     <div className="min-h-screen bg-slate-50 text-black flex flex-col">
       <div className="sticky top-0 z-40 bg-white/90 backdrop-blur rounded-b-3xl border-b px-4 h-14 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2.5">
-          <img src={todayAtt?.photo_url} className="w-9 h-9 rounded-full border-2 border-black object-cover"/>
-          <div><div className="font-bold text-sm">Gate-{gate} • {guardId} • Present</div><div className="text-xs text-slate-500">{todayCount} Today • {pendingList.length} Pending • {insideList.length} Inside • {todayAtt? new Date(todayAtt.login_time).toLocaleTimeString():''}</div></div>
+          <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center font-bold">{guardId[0]}</div>
+          <div><div className="font-bold text-sm">Gate-{gate} • {guardId} • Active</div><div className="text-xs text-slate-500">{todayCount} Today • {pendingList.length} Pending • {insideList.length} Inside</div></div>
         </div>
         <button onClick={()=>{localStorage.removeItem('guard_id'); router.push(`/guard/login?gate=${gate}`)}} className="px-3 py-1 rounded-full bg-black text-white text-xs font-bold">Logout</button>
       </div>
