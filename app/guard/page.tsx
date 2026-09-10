@@ -1,4 +1,59 @@
-'use client'
+"use client"
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase"
+import { useSearchParams, useRouter } from "next/navigation"
+
+export default function GuardPage(){
+  const gate = useSearchParams().get('gate') || '3'
+  const router = useRouter()
+  const [guard, setGuard] = useState<any>(null)
+  const [todayAtt, setTodayAtt] = useState<any>(null)
+
+  useEffect(()=>{
+    const gid = localStorage.getItem('guard_id')
+    if(!gid){
+      router.push(`/guard/login?gate=${gate}`)
+      return
+    }
+    // attendance check
+    const check = async()=>{
+      const {data} = await supabase.from('guard_attendance')
+        .select('*, guards(full_name, photo_url)')
+        .eq('guard_id', gid)
+        .gte('login_time', new Date().toISOString().split('T')[0])
+        .order('login_time',{ascending:false}).limit(1).single()
+      
+      if(!data){
+        router.push(`/guard/login?gate=${gate}`)
+      }else{
+        setTodayAtt(data)
+        setGuard(data.guards)
+      }
+    }
+    check()
+  },[])
+
+  if(!todayAtt) return <div className="p-10 text-center font-black">Checking Attendance...</div>
+
+  return (
+    <div>
+      {/* TOP BAR - PRESENT BADGE */}
+      <div className="bg-white border-b-2 border-black p-3 flex justify-between items-center sticky top-0 z-20">
+        <div className="flex gap-3 items-center">
+          <img src={todayAtt.photo_url} className="w-12 h-12 rounded-full border-2 border-black"/>
+          <div>
+            <div className="font-black">{todayAtt.guard_id} - Present {new Date(todayAtt.login_time).toLocaleTimeString()}</div>
+            <div className="text-xs">Gate-{gate} | {todayAtt.date}</div>
+          </div>
+        </div>
+        <span className="bg-green-600 text-white px-4 py-1 rounded-full text-xs font-black">PRESENT</span>
+      </div>
+
+      {/* Aapka purana dashboard code yahi se start hoga */}
+      {/* ... Flat No Search etc ... */}
+    </div>
+  )
+}'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
