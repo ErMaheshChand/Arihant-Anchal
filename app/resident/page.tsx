@@ -16,10 +16,12 @@ export default function ResidentApp() {
   const [vName, setVName] = useState('')
   const [vMobile, setVMobile] = useState('')
   const [bills, setBills] = useState<any[]>([])
+  const [cashDeposits, setCashDeposits] = useState<any[]>([])
+  const [ledger, setLedger] = useState<any[]>([])
   const [payingId, setPayingId] = useState<string|null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const beepInterval = useRef<any>(null)
-  const SOCIETY_UPI = 'anchalsociety@okicici' // <-- apna UPI ID yaha dalo
+  const SOCIETY_UPI = 'anchalsociety@okicici'
 
   useEffect(()=>{
     const saved = localStorage.getItem('flat_no') || localStorage.getItem('resident_flat') || 'B-302'
@@ -57,6 +59,12 @@ export default function ResidentApp() {
     if(billTo) q = q.lte('due_date', billTo)
     const { data } = await q
     if(data) setBills(data)
+
+    const { data: cash } = await supabase.from('cash_deposits').select('*').eq('flat_no', flatNo).order('deposit_date',{ascending:false})
+    if(cash) setCashDeposits(cash)
+
+    const { data: led } = await supabase.from('society_ledger').select('*').eq('flat_no', flatNo).order('created_at',{ascending:false})
+    if(led) setLedger(led)
   }
 
   useEffect(()=>{
@@ -65,7 +73,9 @@ export default function ResidentApp() {
     const ch = supabase.channel('resident-'+flatNo).on('postgres_changes', {event:'*', schema:'public', table:'visitors', filter:`resident_flat=eq.${flatNo}`}, ()=>loadVisitors()).subscribe()
     const ch2 = supabase.channel('emergency-resident').on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{ const data = payload.new as any; if(data.target === 'ALL'){ setEmergencyAlert(data); startBeep() } }).subscribe()
     const ch3 = supabase.channel('bills-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'bills', filter:`flat_no=eq.${flatNo}`},()=>loadBills()).subscribe()
-    return ()=>{ supabase.removeChannel(ch); supabase.removeChannel(ch2); supabase.removeChannel(ch3); if(beepInterval.current) clearInterval(beepInterval.current) }
+    const ch4 = supabase.channel('cash-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'cash_deposits', filter:`flat_no=eq.${flatNo}`},()=>loadBills()).subscribe()
+    const ch5 = supabase.channel('ledger-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'society_ledger', filter:`flat_no=eq.${flatNo}`},()=>loadBills()).subscribe()
+    return ()=>{ supabase.removeChannel(ch); supabase.removeChannel(ch2); supabase.removeChannel(ch3); supabase.removeChannel(ch4); supabase.removeChannel(ch5); if(beepInterval.current) clearInterval(beepInterval.current) }
   },[flatNo])
   useEffect(()=>{ if(flatNo) loadVisitors() },[fromDate,toDate])
   useEffect(()=>{ if(flatNo) loadBills() },[billFrom,billTo])
@@ -92,13 +102,13 @@ export default function ResidentApp() {
     const doc = new jsPDF()
     doc.setFontSize(18); doc.text('Anchal Society - Payment Receipt', 20, 20)
     doc.setFontSize(11)
-    doc.text(`Receipt No: ${bill.receipt_no || 'N/A'}`, 20, 30)
+    doc.text(`Receipt No: ${bill.receipt_no || bill.receiptNo || 'N/A'}`, 20, 30)
     doc.text(`Flat No: ${bill.flat_no}`, 20, 38)
     doc.text(`Title: ${bill.title}`, 20, 46)
     doc.text(`Amount: Rs. ${bill.amount}`, 20, 54)
-    doc.text(`Pay Mode: ${bill.pay_mode || 'UPI'} (${SOCIETY_UPI})`, 20, 62)
-    doc.text(`Paid At: ${bill.paid_at? new Date(bill.paid_at).toLocaleString() : new Date().toLocaleString()}`, 20, 70)
-    doc.text(`Status: ${bill.status.toUpperCase()}`, 20, 78)
+    doc.text(`Pay Mode: ${bill.pay_mode || bill.payMode || 'CASH'} (${SOCIETY_UPI})`, 20, 62)
+    doc.text(`Paid At: ${bill.paid_at? new Date(bill.paid_at).toLocaleString() : bill.deposit_date? new Date(bill.deposit_date).toLocaleString() : new Date().toLocaleString()}`, 20, 70)
+    doc.text(`Status: PAID`, 20, 78)
     doc.setFontSize(10); doc.text(`Thank you for payment!`, 20, 90)
     doc.save(`${bill.receipt_no || bill.id}_${bill.flat_no}.pdf`)
   }
@@ -126,6 +136,24 @@ export default function ResidentApp() {
   const oldDue = pendingBills.filter(b=>b.type==='old_due').reduce((s,b)=>s+Number(b.amount),0)
   const otherDue = pendingBills.filter(b=>b.type==='other').reduce((s,b)=>s+Number(b.amount),0)
   const totalDue = pendingBills.reduce((s,b)=>s+Number(b.amount),0)
+  const totalPaidBills = bills.filter(b=>b.status==='paid').reduce((s,b)=>s+Number(b.amount),0)
+  const totalCollection = ledger.filter(l=>l.type==='credit').reduce((s,l)=>s+Number(l.amount),0)
+  const totalCash = cashDeposits.reduce((s,c)=>s+Number(c.amount),0)
+
+  // Combined History = Ledger (Cash + Online) is final truth
+  const combinedHistory = ledger.map(l=>{
+    const receipt = l.title.includes(' - ')? l.title.split(' - ')[1] : ''
+    const isCash = l.title.toUpperCase().includes('CASH')
+    return {
+      id: l.id,
+      title: l.title,
+      amount: l.amount,
+      created_at: l.created_at,
+      pay_mode: isCash? 'CASH' : 'ONLINE',
+      receipt_no: receipt,
+      deposit_date: l.created_at
+    }
+  })
 
   return (
     <div className="min-h-screen bg-slate-50 text-black flex flex-col" onClick={()=>{ if(!soundEnabled) enableSound() }}>
@@ -158,7 +186,13 @@ export default function ResidentApp() {
                 ))}
               </div>
             )}
-            <div className="rounded-3xl bg-slate-900 text-white p-5"><div className="text- tracking-widest opacity-60 font-bold">TOTAL DUE</div><div className="mt-1 text-2xl font-bold">₹{totalDue || 2450}</div><div className="text-xs opacity-60 mt-1">Monthly ₹{monthlyDue} + Old ₹{oldDue} + Other ₹{otherDue}</div><button onClick={()=>setTab('bills')} className="mt-3 w-full h-10 rounded-full bg-white text-black text-xs font-bold">View & Pay →</button></div>
+            <div className="rounded-3xl bg-slate-900 text-white p-5">
+              <div className="text- tracking-widest opacity-60 font-bold">TOTAL PENDING DUE</div>
+              <div className="mt-1 text-2xl font-bold">₹{totalDue || 0}</div>
+              <div className="text- opacity-60 mt-1">Monthly ₹{monthlyDue} + Old ₹{oldDue} + Other ₹{otherDue}</div>
+              <div className="text- mt-2 bg-white/10 rounded-full px-3 py-1 inline-block">Ledger Paid (Cash+Online): ₹{totalCollection} (Cash ₹{totalCash})</div>
+              <button onClick={()=>setTab('bills')} className="mt-3 w-full h-10 rounded-full bg-white text-black text-xs font-bold">View & Pay →</button>
+            </div>
           </>
         )}
 
@@ -188,6 +222,7 @@ export default function ResidentApp() {
               <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-amber-400/20" />
               <div className="text- tracking-widest opacity-60 font-bold">TOTAL PENDING DUE</div>
               <div className="mt-1 flex items-baseline gap-2"><span className="text-3xl font-bold">₹{totalDue}</span><span className="text-xs opacity-60">Flat {flatNo}</span></div>
+              <div className="mt-1 text- bg-white/10 rounded-full px-2 py-1 inline-block">Paid Total (Ledger): ₹{totalCollection} | Cash: ₹{totalCash} | Online: ₹{totalCollection-totalCash}</div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
                 <div className="p-2.5 rounded-2xl bg-white/10"><div className="opacity-60">Monthly</div><div className="font-bold text-sm">₹{monthlyDue}</div></div>
                 <div className="p-2.5 rounded-2xl bg-white/10"><div className="opacity-60">Old Due</div><div className="font-bold text-sm">₹{oldDue}</div></div>
@@ -206,7 +241,27 @@ export default function ResidentApp() {
               <div className="mt-2 space-y-2">{pendingBills.length===0? <div className="p-4 rounded-2xl bg-white border text-xs text-center">No dues 🎉</div> : pendingBills.map(b=>(<div key={b.id} className="p-4 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{b.title}</div><div className="text- text-slate-500">Due: {b.due_date} • {b.type}</div></div><div className="text-right"><div className="font-black text-sm">₹{b.amount}</div><button disabled={payingId===b.id} onClick={()=>handlePay(b)} className="mt-1 px-4 py-1.5 rounded-full bg-emerald-600 text-white text- font-bold">{payingId===b.id?'...':'Pay UPI'}</button></div></div>))}</div>
             </div>
 
-            <div className="mt-6"><div className="text-sm font-bold">Payment History (Scroll + Receipt)</div><div className="mt-3 rounded-3xl bg-white border overflow-hidden"><div className="max-h- overflow-y-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-50 border-b text- font-bold text-slate-500"><tr><th className="text-left p-3">Date/Time</th><th className="text-left p-3">Title</th><th className="text-right p-3">Amt</th><th className="text-right p-3">Receipt</th></tr></thead><tbody>{bills.map(b=>(<tr key={b.id} className="border-b last:border-0"><td className="p-3"><div className="font-bold">{b.paid_at? new Date(b.paid_at).toLocaleDateString() : b.due_date}</div><div className="text- text-slate-400">{b.paid_at? new Date(b.paid_at).toLocaleTimeString() : 'Pending'}</div><div className="text-">{b.receipt_no||''}</div></td><td className="p-3"><div className="font-medium">{b.title}</div><div className={`text- px-1.5 py-0.5 rounded-full inline-block font-bold ${b.status==='paid'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>{b.status}</div></td><td className="p-3 text-right font-bold">₹{b.amount}</td><td className="p-3 text-right">{b.status==='paid'? <button onClick={()=>downloadReceipt(b)} className="px-3 py-1 rounded-full bg-black text-white text-">PDF</button> : '-'}</td></tr>))}</tbody></table></div></div></div>
+            <div className="mt-6">
+              <div className="text-sm font-bold">Payment History - Cash + Online (Scroll + Receipt)</div>
+              <div className="mt-3 rounded-3xl bg-white border overflow-hidden">
+                <div className="max-h- overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-slate-50 border-b text- font-bold text-slate-500"><tr><th className="text-left p-3">Date/Time</th><th className="text-left p-3">Title</th><th className="text-right p-3">Amt</th><th className="text-right p-3">Receipt</th></tr></thead>
+                    <tbody>
+                      {combinedHistory.map((h:any)=>(
+                        <tr key={h.id} className="border-b last:border-0">
+                          <td className="p-3"><div className="font-bold">{new Date(h.created_at).toLocaleDateString()}</div><div className="text- text-slate-400">{new Date(h.created_at).toLocaleTimeString()}</div><div className="text-">{h.receipt_no||''}</div></td>
+                          <td className="p-3"><div className="font-medium">{h.title}</div><div className="flex gap-1 mt-1"><span className={`text- px-1.5 py-0.5 rounded-full font-bold ${h.pay_mode==='CASH'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>{h.pay_mode}</span><span className="text- px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">PAID</span></div></td>
+                          <td className="p-3 text-right font-bold">₹{h.amount}</td>
+                          <td className="p-3 text-right"><button onClick={()=>downloadReceipt(h)} className="px-3 py-1 rounded-full bg-black text-white text-">PDF</button></td>
+                        </tr>
+                      ))}
+                      {combinedHistory.length===0 && <tr><td colSpan={4} className="p-8 text-center opacity-40">No payments yet - Cash deposit karo to yaha dikhega</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
