@@ -59,10 +59,8 @@ export default function ResidentApp() {
     if(billTo) q = q.lte('due_date', billTo)
     const { data } = await q
     if(data) setBills(data)
-
     const { data: cash } = await supabase.from('cash_deposits').select('*').eq('flat_no', flatNo).order('deposit_date',{ascending:false})
     if(cash) setCashDeposits(cash)
-
     const { data: led } = await supabase.from('society_ledger').select('*').eq('flat_no', flatNo).order('created_at',{ascending:false})
     if(led) setLedger(led)
   }
@@ -102,15 +100,15 @@ export default function ResidentApp() {
     const doc = new jsPDF()
     doc.setFontSize(18); doc.text('Anchal Society - Payment Receipt', 20, 20)
     doc.setFontSize(11)
-    doc.text(`Receipt No: ${bill.receipt_no || bill.receiptNo || 'N/A'}`, 20, 30)
-    doc.text(`Flat No: ${bill.flat_no}`, 20, 38)
+    doc.text(`Receipt No: ${bill.receipt_no || 'N/A'}`, 20, 30)
+    doc.text(`Flat No: ${bill.flat_no || flatNo}`, 20, 38)
     doc.text(`Title: ${bill.title}`, 20, 46)
     doc.text(`Amount: Rs. ${bill.amount}`, 20, 54)
-    doc.text(`Pay Mode: ${bill.pay_mode || bill.payMode || 'CASH'} (${SOCIETY_UPI})`, 20, 62)
-    doc.text(`Paid At: ${bill.paid_at? new Date(bill.paid_at).toLocaleString() : bill.deposit_date? new Date(bill.deposit_date).toLocaleString() : new Date().toLocaleString()}`, 20, 70)
+    doc.text(`Pay Mode: ${bill.pay_mode || 'CASH'} (${SOCIETY_UPI})`, 20, 62)
+    doc.text(`Paid At: ${bill.created_at? new Date(bill.created_at).toLocaleString() : new Date().toLocaleString()}`, 20, 70)
     doc.text(`Status: PAID`, 20, 78)
-    doc.setFontSize(10); doc.text(`Thank you for payment!`, 20, 90)
-    doc.save(`${bill.receipt_no || bill.id}_${bill.flat_no}.pdf`)
+    doc.setFontSize(10); doc.text(`Thank you!`, 20, 90)
+    doc.save(`${bill.receipt_no || bill.id}_${flatNo}.pdf`)
   }
 
   const handlePay = async (bill:any)=>{
@@ -126,7 +124,7 @@ export default function ResidentApp() {
       const paidBill = {...bill, status:'paid', paid_at: new Date().toISOString(), pay_mode:'UPI', receipt_no: receiptNo, flat_no: flatNo}
       await downloadReceipt(paidBill)
       loadBills()
-      alert(`✅ Paid + Receipt Downloaded + Admin Balance Updated`)
+      alert(`✅ Paid + Receipt Downloaded`)
       setPayingId(null)
     },2500)
   }
@@ -136,23 +134,13 @@ export default function ResidentApp() {
   const oldDue = pendingBills.filter(b=>b.type==='old_due').reduce((s,b)=>s+Number(b.amount),0)
   const otherDue = pendingBills.filter(b=>b.type==='other').reduce((s,b)=>s+Number(b.amount),0)
   const totalDue = pendingBills.reduce((s,b)=>s+Number(b.amount),0)
-  const totalPaidBills = bills.filter(b=>b.status==='paid').reduce((s,b)=>s+Number(b.amount),0)
   const totalCollection = ledger.filter(l=>l.type==='credit').reduce((s,l)=>s+Number(l.amount),0)
   const totalCash = cashDeposits.reduce((s,c)=>s+Number(c.amount),0)
 
-  // Combined History = Ledger (Cash + Online) is final truth
   const combinedHistory = ledger.map(l=>{
     const receipt = l.title.includes(' - ')? l.title.split(' - ')[1] : ''
     const isCash = l.title.toUpperCase().includes('CASH')
-    return {
-      id: l.id,
-      title: l.title,
-      amount: l.amount,
-      created_at: l.created_at,
-      pay_mode: isCash? 'CASH' : 'ONLINE',
-      receipt_no: receipt,
-      deposit_date: l.created_at
-    }
+    return { id:l.id, title:l.title, amount:l.amount, created_at:l.created_at, pay_mode:isCash?'CASH':'ONLINE', receipt_no:receipt }
   })
 
   return (
@@ -241,27 +229,37 @@ export default function ResidentApp() {
               <div className="mt-2 space-y-2">{pendingBills.length===0? <div className="p-4 rounded-2xl bg-white border text-xs text-center">No dues 🎉</div> : pendingBills.map(b=>(<div key={b.id} className="p-4 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{b.title}</div><div className="text- text-slate-500">Due: {b.due_date} • {b.type}</div></div><div className="text-right"><div className="font-black text-sm">₹{b.amount}</div><button disabled={payingId===b.id} onClick={()=>handlePay(b)} className="mt-1 px-4 py-1.5 rounded-full bg-emerald-600 text-white text- font-bold">{payingId===b.id?'...':'Pay UPI'}</button></div></div>))}</div>
             </div>
 
+            {/* PAYMENT HISTORY WITH SCROLL */}
             <div className="mt-6">
-              <div className="text-sm font-bold">Payment History - Cash + Online (Scroll + Receipt)</div>
-              <div className="mt-3 rounded-3xl bg-white border overflow-hidden">
-                <div className="max-h- overflow-y-auto">
+              <div className="flex justify-between items-center">
+                <div className="text-sm font-bold">Payment History - Cash + Online</div>
+                <div className="text- bg-black text-white px-2 py-1 rounded-full">{combinedHistory.length} receipts</div>
+              </div>
+              <div className="mt-3 rounded-3xl bg-white border overflow-hidden shadow-sm">
+                <div className="max-h- overflow-y-auto overflow-x-hidden" style={{scrollbarWidth:'thin'}}>
                   <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-slate-50 border-b text- font-bold text-slate-500"><tr><th className="text-left p-3">Date/Time</th><th className="text-left p-3">Title</th><th className="text-right p-3">Amt</th><th className="text-right p-3">Receipt</th></tr></thead>
+                    <thead className="sticky top-0 z-10 bg-slate-900 text-white text- font-bold">
+                      <tr><th className="text-left p-3">Date/Time</th><th className="text-left p-3">Title</th><th className="text-right p-3">Amt</th><th className="text-right p-3">Receipt</th></tr>
+                    </thead>
                     <tbody>
                       {combinedHistory.map((h:any)=>(
-                        <tr key={h.id} className="border-b last:border-0">
-                          <td className="p-3"><div className="font-bold">{new Date(h.created_at).toLocaleDateString()}</div><div className="text- text-slate-400">{new Date(h.created_at).toLocaleTimeString()}</div><div className="text-">{h.receipt_no||''}</div></td>
-                          <td className="p-3"><div className="font-medium">{h.title}</div><div className="flex gap-1 mt-1"><span className={`text- px-1.5 py-0.5 rounded-full font-bold ${h.pay_mode==='CASH'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>{h.pay_mode}</span><span className="text- px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">PAID</span></div></td>
+                        <tr key={h.id} className="border-b last:border-0 hover:bg-slate-50">
+                          <td className="p-3"><div className="font-bold">{new Date(h.created_at).toLocaleDateString()}</div><div className="text- text-slate-400">{new Date(h.created_at).toLocaleTimeString()}</div><div className="text- opacity-60 truncate max-w-">{h.receipt_no||''}</div></td>
+                          <td className="p-3"><div className="font-medium truncate max-w-">{h.title}</div><div className="flex gap-1 mt-1"><span className={`text- px-1.5 py-0.5 rounded-full font-bold ${h.pay_mode==='CASH'?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>{h.pay_mode}</span><span className="text- px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">PAID</span></div></td>
                           <td className="p-3 text-right font-bold">₹{h.amount}</td>
                           <td className="p-3 text-right"><button onClick={()=>downloadReceipt(h)} className="px-3 py-1 rounded-full bg-black text-white text-">PDF</button></td>
                         </tr>
                       ))}
-                      {combinedHistory.length===0 && <tr><td colSpan={4} className="p-8 text-center opacity-40">No payments yet - Cash deposit karo to yaha dikhega</td></tr>}
+                      {combinedHistory.length===0 && <tr><td colSpan={4} className="p-8 text-center opacity-40">No payments yet</td></tr>}
                     </tbody>
                   </table>
                 </div>
+                <div className="p-2 bg-slate-50 text- text-center font-bold text-slate-500 border-t">
+                  ↕️ Scroll karo up/down — {combinedHistory.length} receipts • Cash ₹{totalCash} + Online ₹{totalCollection-totalCash}
+                </div>
               </div>
             </div>
+
           </div>
         )}
 
