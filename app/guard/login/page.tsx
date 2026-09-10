@@ -33,27 +33,34 @@ export default function GuardLogin(){
     const {data:guard} = await supabase.from('guards').select('*').eq('guard_id', guardId).eq('status','active').single()
     if(!guard || guard.password!==password){ setLoading(false); return alert("ID/Password galat") }
 
-    // SIRF GATE-1 CHECK
-    if(String(guard.gate_no)!== "1" || String(reqGate)!=="1"){
+    if(String(guard.gate_no)!== "1"){
       setLoading(false)
-      return alert(`Ye Guard Gate-${guard.gate_no} ka hai, Gate-1 par login nahi hoga`)
+      return alert(`Ye Guard Gate-${guard.gate_no} ka hai`)
     }
 
-    const blob = await (await fetch(photo)).blob()
-    const fileName = `attendance/${guardId}_${Date.now()}.jpg`
-    await supabase.storage.from('guard-photos').upload(fileName, blob).catch(async()=>{ await supabase.storage.from('guards').upload(fileName, blob) })
-    const {data:urlData} = supabase.storage.from('guard-photos').getPublicUrl(fileName)
-
-    await supabase.from('guard_attendance').insert({
-      guard_id: guardId, gate_no: "1", photo_url: urlData.publicUrl,
-      date: new Date().toISOString().split('T')[0],
-      login_time: new Date().toISOString(), status: 'present'
-    })
-
+    // Pehle local me save, taaki redirect pakka ho
     localStorage.setItem('guard_id', guardId)
+    localStorage.setItem('guard_gate', "1")
+
+    // Attendance background me try karo, fail bhi hua to redirect nahi rukega
+    try{
+      const blob = await (await fetch(photo)).blob()
+      const fileName = `attendance/${guardId}_${Date.now()}.jpg`
+      await supabase.storage.from('guard-photos').upload(fileName, blob).catch(()=>{})
+      const {data:urlData} = supabase.storage.from('guard-photos').getPublicUrl(fileName)
+      await supabase.from('guard_attendance').insert({
+        guard_id: guardId, gate_no: "1", photo_url: urlData.publicUrl,
+        date: new Date().toISOString().split('T')[0],
+        login_time: new Date().toISOString(), status: 'present'
+      })
+    }catch(e){ console.log("attendance error", e) }
+
     setLoading(false)
-    alert("Gate-1 Login Successful ✅")
-    window.location.href = "/guard?gate=1"
+    // Alert ke baad 500ms me force redirect
+    alert("Login Successful ✅ Gate-1 par ja rahe hain")
+    setTimeout(()=>{
+      window.location.replace(`/guard?gate=1&guard_id=${guardId}`)
+    },500)
   }
 
   return (
