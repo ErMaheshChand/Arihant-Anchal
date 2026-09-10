@@ -19,14 +19,12 @@ export default function HomePage() {
     if(p){ setFlatNo(p); setShowLoginModal(true) }
   },[])
 
-  // 🚨 EMERGENCY BROADCAST LISTENER - ALL RESIDENTS
   useEffect(()=>{
     const ch = supabase.channel('emergency-home')
-     .on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{
         const data = payload.new as any
         if(data.target === 'ALL'){
           setEmergencyAlert(data)
-          // 30 sec baad auto hide
           setTimeout(()=>setEmergencyAlert(null), 30000)
         }
       }).subscribe()
@@ -71,9 +69,7 @@ export default function HomePage() {
           </nav>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <button onClick={()=>{ setShowResidentMenu(!showResidentMenu); setShowLoginMenu(false) }} className="px-4 md:px-5 h-9 md:h-10 rounded-full bg-white text-black text-xs md:text-sm font-bold flex items-center gap-1">
-                Resident <span className="text-">{showResidentMenu?'▲':'▼'}</span>
-              </button>
+              <button onClick={()=>{ setShowResidentMenu(!showResidentMenu); setShowLoginMenu(false) }} className="px-4 md:px-5 h-9 md:h-10 rounded-full bg-white text-black text-xs md:text-sm font-bold flex items-center gap-1">Resident <span className="text-">{showResidentMenu?'▲':'▼'}</span></button>
               {showResidentMenu && (
                 <div className="absolute top-12 right-0 w-60 bg-[#141E32] border border-white/10 rounded-2xl shadow-2xl p-2 z-50">
                   <button onClick={()=>go('/register')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
@@ -88,35 +84,30 @@ export default function HomePage() {
               )}
             </div>
             <div className="relative">
-              <button onClick={()=>{ setShowLoginMenu(!showLoginMenu); setShowResidentMenu(false) }} className="px-4 md:px-5 h-9 md:h-10 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8960C] text-black text-xs md:text-sm font-black flex items-center gap-1.5 shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-                Login <span className="text-">{showLoginMenu?'▲':'▼'}</span>
-              </button>
+              <button onClick={()=>{ setShowLoginMenu(!showLoginMenu); setShowResidentMenu(false) }} className="px-4 md:px-5 h-9 md:h-10 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8960C] text-black text-xs md:text-sm font-black flex items-center gap-1.5">Login <span className="text-">{showLoginMenu?'▲':'▼'}</span></button>
               {showLoginMenu && (
-                <div className="absolute top-12 right-0 w-72 bg-[#141E32] border border-[#D4AF37]/20 rounded-2xl shadow-2xl p-2 z-50 overflow-hidden">
+                <div className="absolute top-12 right-0 w-72 bg-[#141E32] border border-[#D4AF37]/20 rounded-2xl shadow-2xl p-2 z-50">
                   <div className="px-3 py-2 text- tracking-widest text-[#D4AF37]/60 font-bold">SELECT LOGIN TYPE</div>
-                  <button onClick={()=>{ setShowLoginMenu(false); setLoginRole('resident'); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
+                  <button onClick={()=>{ setShowLoginMenu(false); setLoginRole('resident'); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
                     <div className="w-9 h-9 rounded-xl bg-white text-black flex items-center justify-center">👤</div>
                     <div className="flex-1"><div className="text-sm font-bold">Resident Login</div><div className="text- text-white/50">Flat No + Password</div></div>
-                    <div className="text-white/20">→</div>
                   </button>
                   <div className="relative">
-                    <button onClick={()=>setShowGuardSub(!showGuardSub)} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
+                    <button onClick={()=>setShowGuardSub(!showGuardSub)} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
                       <div className="w-9 h-9 rounded-xl bg-[#D4AF37] text-black flex items-center justify-center">🛡</div>
-                      <div className="flex-1"><div className="text-sm font-bold">Guard Login</div><div className="text- text-white/50">Gate 1 to 5 • Visitor Entry</div></div>
-                      <div className="text-white/40 text-xs">{showGuardSub?'▲':'▼'}</div>
+                      <div className="flex-1"><div className="text-sm font-bold">Guard Login</div><div className="text- text-white/50">Gate 1 to 5</div></div>
                     </button>
                     {showGuardSub && (
                       <div className="ml-4 mr-2 my-1 p-2 rounded-xl bg-black/30 border border-white/10 grid grid-cols-3 gap-2">
                         {[1,2,3,4,5].map(n=>(
-                          <button key={n} onClick={()=>go(`/guard/login?gate=${n}`)} className="h-9 rounded-full bg-white/10 hover:bg-[#D4AF37] hover:text-black text-xs font-bold transition">Gate {n}</button>
+                          <button key={n} onClick={()=>go(`/guard/login?gate=${n}`)} className="h-9 rounded-full bg-white/10 hover:bg-[#D4AF37] hover:text-black text-xs font-bold">Gate {n}</button>
                         ))}
                       </div>
                     )}
                   </div>
-                  <button onClick={()=>go('/admin')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3 border border-transparent hover:border-white/10">
+                  <button onClick={()=>go('/admin')} className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/10 flex gap-3">
                     <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center">⚙</div>
-                    <div className="flex-1"><div className="text-sm font-bold">Admin Login</div><div className="text- text-white/50">Residents • Approval • Reports</div></div>
-                    <div className="text-white/20">→</div>
+                    <div className="flex-1"><div className="text-sm font-bold">Admin Login</div><div className="text- text-white/50">Approval • Reports</div></div>
                   </button>
                 </div>
               )}
@@ -134,7 +125,6 @@ export default function HomePage() {
             <span className="block text-white text-4xl md:text-6xl lg:text-7xl">Arihant Anchal</span>
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F5E6A3] to-[#D4AF37] text-3xl md:text-5xl lg:text-6xl mt-3 font-light italic">Society & Club House</span>
           </h1>
-          <div className="mt-10 w-24 h- bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent mx-auto opacity-60"></div>
         </div>
       </section>
 
@@ -146,22 +136,20 @@ export default function HomePage() {
               <button onClick={()=>setShowLoginModal(false)} className="w-8 h-8 rounded-full bg-white/10">✕</button>
             </div>
             <div className="mt-6 space-y-3">
-              <input value={flatNo} onChange={e=>setFlatNo(e.target.value.toUpperCase())} placeholder="Flat No ex: B-302" className="w-full h-12 rounded-2xl bg-white/10 border border-white/10 px-4 font-bold text-sm placeholder:text-white/40"/>
-              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h-12 rounded-2xl bg-white/10 border border-white/10 px-4 font-bold text-sm placeholder:text-white/40"/>
+              <input value={flatNo} onChange={e=>setFlatNo(e.target.value.toUpperCase())} placeholder="Flat No ex: B-302" className="w-full h-12 rounded-2xl bg-white/10 border border-white/10 px-4 font-bold text-sm"/>
+              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h-12 rounded-2xl bg-white/10 border border-white/10 px-4 font-bold text-sm"/>
               <button onClick={handleLogin} disabled={loading} className="w-full h-12 rounded-full bg-[#D4AF37] text-black font-bold text-sm">{loading?'Checking...':'Login → Resident Page'}</button>
-              <div className="text-center text-xs text-white/40">New ho? <Link href="/register" className="text-[#D4AF37] font-bold underline">Registration karo</Link></div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🚨 EMERGENCY POPUP - AUTO ALL RESIDENTS - 1 ROW ONLY G-1-796440 */}
       {emergencyAlert && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white border-4 border-red-600 rounded-3xl p-6 shadow-[0_0_50px_rgba(255,0,0,0.5)] animate-pulse">
+          <div className="w-full max-w-md bg-white border-4 border-red-600 rounded-3xl p-6 shadow-[0_0_50px_rgba(255,0,0,0.5)]">
             <div className="text-4xl text-center">🚨</div>
             <h2 className="font-black text-2xl text-center text-red-600 mt-2">EMERGENCY ALERT</h2>
-            <div className="text-center mt-1 text-xs font-bold bg-red-600 text-white px-3 py-1 rounded-full inline-block mx-auto">{emergencyAlert.emergency_type} • Gate-{emergencyAlert.gate_no} • {emergencyAlert.guard_id}</div>
+            <div className="text-center mt-2 text-xs font-bold bg-red-600 text-white px-3 py-1 rounded-full inline-block">{emergencyAlert.emergency_type} • Gate-{emergencyAlert.gate_no} • {emergencyAlert.guard_id}</div>
             <div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-2xl font-bold text-center text-black text-sm">{emergencyAlert.message}</div>
             <div className="text- text-center text-slate-500 mt-2">Time: {new Date(emergencyAlert.created_at).toLocaleString()}</div>
             <button onClick={()=>setEmergencyAlert(null)} className="mt-4 w-full h-12 bg-red-600 text-white rounded-full font-black">OK - Samajh Gaya</button>
