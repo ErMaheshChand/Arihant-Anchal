@@ -85,7 +85,7 @@ function GuardInner() {
       photoUrl = data.publicUrl
     }
     const { data, error } = await supabase.from('visitors').insert({
- ...payload, photo_url: photoUrl, entry_time: new Date().toISOString(), created_at: new Date().toISOString()
+...payload, photo_url: photoUrl, entry_time: new Date().toISOString(), created_at: new Date().toISOString()
     }).select().single()
     setLoading(false)
     if(!error && data){
@@ -115,11 +115,38 @@ function GuardInner() {
     if(res) alert(`🚗 Vehicle Approval Sent`)
   }
 
+  // 🔥 UPDATED - SIRF 1 ROW BANEGI G-1-796440 SE - AUTO ALL RESIDENTS
   const handleEmergency = async () => {
     if(!emergencyNote) return alert('Emergency detail likho')
     setLoading(true)
-    await supabase.from('complaints').insert({ flat_no: flat.toUpperCase() || 'ALL', title: `🚨 EMERGENCY - ${emergencyType}`, description: emergencyNote, category:'Emergency', priority:'high', status:'open' })
-    setLoading(false); setEmergencyNote(''); alert(`🚨 Emergency Broadcast Done!`); loadVisitors()
+    try{
+      // 1 row hi banegi - target ALL
+      const { error } = await supabase.from('emergency_broadcasts').insert({
+        guard_id: guardId,
+        gate_no: gate,
+        emergency_type: emergencyType,
+        message: emergencyNote,
+        target: 'ALL',
+        created_at: new Date().toISOString()
+      })
+      if(error) throw error
+
+      // Record ke liye complaints me bhi
+      await supabase.from('complaints').insert({
+        flat_no: 'ALL',
+        title: `🚨 EMERGENCY - ${emergencyType} - by ${guardId}`,
+        description: emergencyNote,
+        category:'Emergency',
+        priority:'high',
+        status:'open'
+      })
+
+      alert(`🚨 Broadcast Done! Guard ${guardId} se ALL residents ko popup chala gaya`)
+      setEmergencyNote('')
+    }catch(e:any){
+      alert(e.message)
+    }
+    setLoading(false)
   }
 
   const markExit = async (id:string) => {
@@ -206,10 +233,11 @@ function GuardInner() {
         {tab==='emergency' && (
           <div className="mt-4 space-y-4">
             <div className="p-5 rounded-3xl bg-white border shadow-sm">
-              <div className="text-sm font-bold">🚨 Emergency Broadcast</div>
+              <div className="text-sm font-bold">🚨 Emergency Broadcast - ALL Residents</div>
+              <p className="text-xs text-slate-500 mt-1">Ye message sabhi registered residents ko popup ke roop me jayega</p>
               <select value={emergencyType} onChange={e=>setEmergencyType(e.target.value)} className="mt-3 w-full h-12 rounded-2xl bg-red-50 border px-3 text-sm font-bold"><option>Fire</option><option>Medical</option><option>Theft</option><option>Water Leak</option></select>
-              <textarea value={emergencyNote} onChange={e=>setEmergencyNote(e.target.value)} placeholder="Detail likho..." className="mt-3 w-full h-24 rounded-2xl border p-3 text-sm" />
-              <button onClick={handleEmergency} disabled={loading} className="mt-3 w-full h-12 rounded-full bg-red-600 text-white font-bold text-sm">🚨 Broadcast</button>
+              <textarea value={emergencyNote} onChange={e=>setEmergencyNote(e.target.value)} placeholder="Detail likho... ex: Building me aag lag gayi hai" className="mt-3 w-full h-24 rounded-2xl border p-3 text-sm" />
+              <button onClick={handleEmergency} disabled={loading} className="mt-3 w-full h-12 rounded-full bg-red-600 text-white font-bold text-sm">{loading? 'Bhej raha hu...' : `🚨 ALL Residents ko Bhejo - ${guardId}`}</button>
             </div>
             <div className="p-5 rounded-3xl bg-slate-900 text-white">
               <div className="text-sm font-bold">EMERGENCY NUMBERS</div>
