@@ -7,7 +7,7 @@ export default function GuardLogin(){
   const [password, setPassword] = useState("")
   const [photo, setPhoto] = useState<string>("")
   const [loading, setLoading] = useState(false)
-  const [reqGate, setReqGate] = useState("3")
+  const [reqGate, setReqGate] = useState("1")
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(()=>{
@@ -33,10 +33,10 @@ export default function GuardLogin(){
     const {data:guard} = await supabase.from('guards').select('*').eq('guard_id', guardId).eq('status','active').single()
     if(!guard || guard.password!==password){ setLoading(false); return alert("ID/Password galat") }
 
-    // GATE CHECK - yahi main logic hai
-    if(String(guard.gate_no)!== String(reqGate)){
+    // SIRF GATE-1 CHECK
+    if(String(guard.gate_no)!== "1" || String(reqGate)!=="1"){
       setLoading(false)
-      return alert(`Aap Gate-${guard.gate_no} ke liye register ho, Gate-${reqGate} par login nahi kar sakte`)
+      return alert(`Ye Guard Gate-${guard.gate_no} ka hai, Gate-1 par login nahi hoga`)
     }
 
     const blob = await (await fetch(photo)).blob()
@@ -45,21 +45,21 @@ export default function GuardLogin(){
     const {data:urlData} = supabase.storage.from('guard-photos').getPublicUrl(fileName)
 
     await supabase.from('guard_attendance').insert({
-      guard_id: guardId, gate_no: guard.gate_no, photo_url: urlData.publicUrl,
+      guard_id: guardId, gate_no: "1", photo_url: urlData.publicUrl,
       date: new Date().toISOString().split('T')[0],
       login_time: new Date().toISOString(), status: 'present'
     })
 
     localStorage.setItem('guard_id', guardId)
     setLoading(false)
-    alert("Login Successful ✅")
-    window.location.href = `/guard?gate=${guard.gate_no}`
+    alert("Gate-1 Login Successful ✅")
+    window.location.href = "/guard?gate=1"
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#f6f7fb]">
       <div className="bg-white border-2 border-black rounded-3xl w-full max-w-md p-6">
-        <h1 className="text-2xl font-extrabold text-center">Guard Login - Gate-{reqGate}</h1>
+        <h1 className="text-2xl font-extrabold text-center">Gate-1 Guard Login</h1>
         <input value={guardId} onChange={e=>setGuardId(e.target.value.toUpperCase())} placeholder="G-001" className="w-full h-12 rounded-full border-2 border-black px-5 mb-3 font-bold mt-4"/>
         <input value={password} type="password" onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h-12 rounded-full border-2 border-black px-5 mb-4"/>
         <div className="bg-black rounded-2xl h-64 flex items-center justify-center relative">
