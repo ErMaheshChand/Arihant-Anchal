@@ -40,7 +40,7 @@ export default function GuardRegister(){
         guard_id: gid,
         gate_no: parseInt(form.gate),
         full_name: form.name,
-        name: form.name,
+        full_name: form.name,
         mobile: form.mobile,
         password: form.pass,
         photo_url: pUrl,
