@@ -1,3 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --input: #f8fafc;
+  --black: #000000;
+  --yellow: #facc15;
+}
+body { background: var(--bg); }
+.card { background: var(--card); border: 2px solid black; border-radius: 12px; }
+.input { background: var(--input); height: 48px; border-radius: 9999px; padding: 0 20px; border: 1px solid #e5e7eb; width: 100%; }
+.btn-black { background: var(--black); color: white; border-radius: 9999px; height: 48px; }
+.btn-yellow { background: var(--yellow); color: black; border-radius: 9999px; height: 48px; font-weight: bold; }
