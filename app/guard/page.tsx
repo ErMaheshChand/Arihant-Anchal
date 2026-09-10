@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation"
 
 export default function GuardMobile() {
   const searchParams = useSearchParams()
-  const gate = searchParams.get('gate') || '1'
+ const searchParams = useSearchParams()
+const gate = searchParams ? searchParams.get('gate') || '1' : '1'
   const router = useRouter()
 
   // --- Attendance Check ---
