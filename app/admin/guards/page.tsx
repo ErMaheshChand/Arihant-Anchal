@@ -19,7 +19,7 @@ export default function AdminGuards(){
     if(statusFilter!="all") q = q.eq('status', statusFilter)
     const {data} = await q
     setList(data||[])
-    const {data: att} = await supabase.from('guard_attendance').select('*').eq('date', today)
+    const {data: att} = await supabase.from('guard_attendance').select('*').gte('login_time', new Date().toISOString().split('T')[0])
     setAttendance(att||[])
   }
   useEffect(()=>{load()},[filterGate, statusFilter])
