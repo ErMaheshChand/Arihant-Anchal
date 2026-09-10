@@ -12,17 +12,18 @@ export default function AdminBillsPage(){
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [newBill, setNewBill] = useState({flat_no:'', title:'', amount:'', type:'monthly', due_date: new Date().toISOString().split('T')[0]})
+  const [cashForm, setCashForm] = useState({amount:'', date: new Date().toISOString().split('T')[0], receipt_no:`RCP-CASH-${Date.now()}`, depositor:'', remarks:''})
 
   const loadFlats = async ()=>{
     const { data } = await supabase.from('residents').select('*').order('flat_no')
     if(data && data.length>0) {
       setFlats(data);
-      if(data[0]) setSelectedFlat(data[0].flat_no)
+      if(data[0] &&!selectedFlat) setSelectedFlat(data[0].flat_no)
     } else {
       const { data: b } = await supabase.from('bills').select('flat_no').order('flat_no')
       const uniq = Array.from(new Set((b||[]).map((x:any)=>x.flat_no))) as string[]
       setFlats(uniq.map(f=>({flat_no:f, name:'Resident', mobile:'-'})))
-      if(uniq[0]) setSelectedFlat(uniq[0])
+      if(uniq[0] &&!selectedFlat) setSelectedFlat(uniq[0])
     }
   }
 
@@ -58,11 +59,50 @@ export default function AdminBillsPage(){
     if(!error){ alert('✅ Bill Added'); setNewBill({...newBill, amount:'', title:''}); loadData() } else alert(error.message)
   }
 
+  const handleCashDeposit = async ()=>{
+    if(!selectedFlat ||!cashForm.amount ||!cashForm.receipt_no){ alert('Amount + Receipt No bharo'); return }
+    const amt = Number(cashForm.amount)
+    // 1. cash_deposits table
+    await supabase.from('cash_deposits').insert({
+      flat_no: selectedFlat,
+      amount: amt,
+      deposit_date: cashForm.date,
+      receipt_no: cashForm.receipt_no,
+      depositor_name: cashForm.depositor || resident?.name || 'Cash',
+      pay_mode: 'CASH',
+      remarks: cashForm.remarks
+    })
+    // 2. ledger credit
+    await supabase.from('society_ledger').insert({
+      flat_no: selectedFlat,
+      amount: amt,
+      type: 'credit',
+      title: `CASH DEPOSIT - ${cashForm.receipt_no} - ${cashForm.depositor}`,
+    })
+    // 3. FIFO bills paid (Old Due first)
+    let remaining = amt
+    const sortedPending = [...bills.filter(b=>b.status==='pending')].sort((a,b)=>{
+      if(a.type==='old_due' && b.type!=='old_due') return -1
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+    })
+    for(const bill of sortedPending){
+      if(remaining<=0) break
+      if(remaining >= Number(bill.amount)){
+        await supabase.from('bills').update({status:'paid', paid_at: new Date().toISOString(), pay_mode:'CASH', receipt_no: cashForm.receipt_no}).eq('id', bill.id)
+        remaining -= Number(bill.amount)
+      }
+    }
+    alert(`✅ CASH DEPOSIT ₹${amt} - ${selectedFlat} - Ledger Updated`)
+    setCashForm({amount:'', date: new Date().toISOString().split('T')[0], receipt_no:`RCP-CASH-${Date.now()}`, depositor:'', remarks:''})
+    loadData()
+  }
+
   const pending = bills.filter(b=>b.status==='pending')
   const paid = bills.filter(b=>b.status==='paid')
   const totalDue = pending.reduce((s,b)=>s+Number(b.amount),0)
   const totalPaid = paid.reduce((s,b)=>s+Number(b.amount),0)
   const totalCollection = ledger.filter(l=>l.type==='credit').reduce((s,l)=>s+Number(l.amount),0)
+  const oldDue = pending.filter(b=>b.type==='old_due').reduce((s,b)=>s+Number(b.amount),0)
   const filteredFlats = flats.filter(f=> f.flat_no.toLowerCase().includes(searchFlat.toLowerCase()))
 
   return (
@@ -98,6 +138,26 @@ export default function AdminBillsPage(){
           </div>
         </div>
 
+        {/* CASH DEPOSIT - SAME PAGE */}
+        {selectedFlat && (
+          <div className="mt-4 p-5 rounded-3xl bg-white border-2 border-emerald-200">
+            <div className="flex justify-between items-center">
+              <h2 className="font-black text-sm">💵 CASH DEPOSIT - {selectedFlat} <span className="ml-2 text-xs px-2 py-1 rounded-full bg-amber-400 text-black">OLD DUE: ₹{oldDue} | TOTAL DUE: ₹{totalDue}</span></h2>
+            </div>
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div><div className="text- font-bold opacity-60">FLAT NO</div><input value={selectedFlat} onChange={e=>setSelectedFlat(e.target.value.toUpperCase())} className="mt-1 w-full h-10 rounded-xl bg-slate-50 border px-3 text-xs font-bold" /></div>
+              <div><div className="text- font-bold opacity-60">AMOUNT *</div><input value={cashForm.amount} onChange={e=>setCashForm({...cashForm, amount:e.target.value})} type="number" placeholder="5000" className="mt-1 w-full h-10 rounded-xl bg-slate-50 border px-3 text-xs font-bold" /></div>
+              <div><div className="text- font-bold opacity-60">DATE</div><input type="date" value={cashForm.date} onChange={e=>setCashForm({...cashForm, date:e.target.value})} className="mt-1 w-full h-10 rounded-xl bg-slate-50 border px-3 text-xs" /></div>
+              <div><div className="text- font-bold opacity-60">RECEIPT NO *</div><input value={cashForm.receipt_no} onChange={e=>setCashForm({...cashForm, receipt_no:e.target.value})} className="mt-1 w-full h-10 rounded-xl bg-slate-50 border px-3 text-xs font-bold" /></div>
+              <div><div className="text- font-bold opacity-60">DEPOSITOR</div><input value={cashForm.depositor} onChange={e=>setCashForm({...cashForm, depositor:e.target.value})} placeholder="Name" className="mt-1 w-full h-10 rounded-xl bg-slate-50 border px-3 text-xs" /></div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 md:grid-cols-4 gap-2">
+              <input value={cashForm.remarks} onChange={e=>setCashForm({...cashForm, remarks:e.target.value})} placeholder="Remarks - Old due clear etc" className="col-span-3 w-full h-10 rounded-xl bg-slate-50 border px-3 text-xs" />
+              <button onClick={handleCashDeposit} className="h-10 rounded-xl bg-emerald-600 text-white text-xs font-black">💵 DEPOSIT & UPDATE LEDGER</button>
+            </div>
+          </div>
+        )}
+
         {resident && (
           <div className="mt-4 p-5 rounded-3xl bg-white border">
             <div className="flex justify-between items-center">
@@ -116,7 +176,7 @@ export default function AdminBillsPage(){
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div className="p-3 rounded-2xl bg-white border-2 border-slate-900"><div className="opacity-60">Monthly Due</div><div className="font-black text-sm">₹{pending.filter(b=>b.type==='monthly').reduce((s,b)=>s+Number(b.amount),0)}</div></div>
-              <div className="p-3 rounded-2xl bg-white border-2 border-amber-300"><div className="opacity-60">Old Due</div><div className="font-black text-sm">₹{pending.filter(b=>b.type==='old_due').reduce((s,b)=>s+Number(b.amount),0)}</div></div>
+              <div className="p-3 rounded-2xl bg-white border-2 border-amber-300"><div className="opacity-60">Old Due</div><div className="font-black text-sm">₹{oldDue}</div></div>
               <div className="p-3 rounded-2xl bg-white border-2 border-blue-300"><div className="opacity-60">Other Charges</div><div className="font-black text-sm">₹{pending.filter(b=>b.type==='other').reduce((s,b)=>s+Number(b.amount),0)}</div></div>
             </div>
           </div>
