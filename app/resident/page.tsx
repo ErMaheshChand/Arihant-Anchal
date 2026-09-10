@@ -1,4 +1,4 @@
-'use client'
+ 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -10,6 +10,8 @@ export default function ResidentApp() {
   const [todayVisitors, setTodayVisitors] = useState<any[]>([])
   const [emergencyAlert, setEmergencyAlert] = useState<any>(null)
   const [soundEnabled, setSoundEnabled] = useState(false)
+  const [vName, setVName] = useState('') // <-- STEP 1 ADDED
+  const [vMobile, setVMobile] = useState('') // <-- STEP 1 ADDED
   const audioRef = useRef<HTMLAudioElement>(null)
   const beepInterval = useRef<any>(null)
 
@@ -47,7 +49,7 @@ export default function ResidentApp() {
     load()
 
     const ch = supabase.channel('resident-'+flatNo)
-  .on('postgres_changes', {event:'*', schema:'public', table:'visitors', filter:`resident_flat=eq.${flatNo}`}, (payload)=>{
+ .on('postgres_changes', {event:'*', schema:'public', table:'visitors', filter:`resident_flat=eq.${flatNo}`}, (payload)=>{
         if(payload.eventType==='INSERT' && payload.new.status==='pending'){
           setPending(p=>[payload.new,...p])
           setTodayVisitors(p=>[payload.new,...p])
@@ -57,14 +59,14 @@ export default function ResidentApp() {
           setTodayVisitors(p=>p.map(v=>v.id===payload.new.id?payload.new:v))
         }
       })
-  .on('postgres_changes', {event:'*', schema:'public', table:'visitors', filter:`flat_no=eq.${flatNo}`}, (payload)=>{
+ .on('postgres_changes', {event:'*', schema:'public', table:'visitors', filter:`flat_no=eq.${flatNo}`}, (payload)=>{
         if(payload.eventType==='INSERT' && payload.new.status==='pending'){
           setPending(p=>p.find(x=>x.id===payload.new.id)?p:[payload.new,...p])
         }
       }).subscribe()
 
     const ch2 = supabase.channel('emergency-resident')
-  .on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{
+ .on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{
         const data = payload.new as any
         if(data.target === 'ALL'){
           setEmergencyAlert(data)
@@ -79,6 +81,23 @@ export default function ResidentApp() {
     const finalStatus = status==='approved'? 'inside' : status
     await supabase.from('visitors').update({status: finalStatus}).eq('id',id)
     setPending(p=>p.filter(v=>v.id!==id))
+  }
+
+  // STEP 1 FUNCTION
+  const handlePreApprove = async ()=>{
+    if(!vName.trim()){ alert('Naam likho bhai'); return }
+    const { error } = await supabase.from('visitors').insert({
+      visitor_name: vName,
+      name: vName,
+      mobile: vMobile,
+      flat_no: flatNo,
+      resident_flat: flatNo,
+      status: 'pre_approved',
+      purpose: 'Pre-approved by resident',
+      guard_id: 'RESIDENT-APP'
+    })
+    if(!error){ alert('✅ Pre-approved ho gaya - Guard ko dikhega'); setVName(''); setVMobile('') }
+    else alert(error.message)
   }
 
   return (
@@ -195,9 +214,9 @@ export default function ResidentApp() {
           <div>
             <h2 className="text-lg font-bold font-serif">Pre-Approve Visitor</h2>
             <div className="mt-5 p-5 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-3">
-              <input placeholder="Visitor Name *" className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-100 px-4 text-sm outline-none focus:border-blue-200 focus:bg-blue-50/30" />
-              <input placeholder="Mobile Number" className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-100 px-4 text-sm" />
-              <button className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-sm shadow">Generate QR & Notify Guard →</button>
+              <input value={vName} onChange={e=>setVName(e.target.value)} placeholder="Visitor Name *" className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-100 px-4 text-sm outline-none focus:border-blue-200 focus:bg-blue-50/30" />
+              <input value={vMobile} onChange={e=>setVMobile(e.target.value)} placeholder="Mobile Number" className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-100 px-4 text-sm" />
+              <button onClick={handlePreApprove} className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-sm shadow">Generate QR & Notify Guard →</button>
             </div>
             <div className="mt-4 p-4 rounded-3xl bg-amber-50 border border-amber-100 text-xs text-amber-800">💡 Guard jab entry karega to aapko yaha approval notification ayega - Real-time ✅</div>
           </div>
