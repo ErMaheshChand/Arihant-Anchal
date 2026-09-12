@@ -8,12 +8,8 @@ const withPWA = require('next-pwa').default({
 
 const nextConfig = {
   reactStrictMode: false,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
 };
 
 module.exports = withPWA(nextConfig);
