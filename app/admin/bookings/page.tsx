@@ -39,7 +39,7 @@ export default function AdminBookingDashboard(){
     // Auto bill add
     await supabase.from('bills').insert({ flat_no: selected.flat_no, title: `${selected.facility_name} Booking ${selected.booking_date}`, amount: selected.amount, type:'other', due_date: selected.booking_date, status:'pending' })
     // History log
-    await supabase.from('booking_history').insert({ booking_id: selected.id, flat_no: selected.flat_no, action:'approved', by:'admin', note:`Due ₹${dueInfo?.totalDue} checked - OK` }).catch(()=>{})
+    try { await supabase.from('booking_history').insert({ booking_id: selected.id, flat_no: selected.flat_no, action:'approved', by:'admin', note:`Due Rs.${dueInfo?.totalDue} checked - OK` }) } catch(e){}
     alert(`✅ Approved ${selected.flat_no} - Bill ₹${selected.amount} Added`)
     setSelected(null); setDueInfo(null); load()
   }
@@ -48,7 +48,7 @@ export default function AdminBookingDashboard(){
     if(!selected) return
     const reason = prompt('Reject reason likho:')||'Rejected by admin'
     await supabase.from('bookings').update({ status:'rejected' }).eq('id', selected.id)
-    await supabase.from('booking_history').insert({ booking_id: selected.id, flat_no: selected.flat_no, action:'rejected', by:'admin', note: reason }).catch(()=>{})
+    try { await supabase.from('booking_history').insert({ booking_id: selected.id, flat_no: selected.flat_no, action:'rejected', by:'admin', note: reason }) } catch(e){}
     alert('Rejected'); setSelected(null); setDueInfo(null); load()
   }
 
