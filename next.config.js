@@ -7,7 +7,7 @@ const nextConfig = {
 
 let exportConfig = nextConfig;
 try {
-  const withPWA = require('next-pwa').default({
+  const withPWA = require('next-pwa')({
     dest: 'public',
     register: true,
     skipWaiting: true,
@@ -15,7 +15,7 @@ try {
   });
   exportConfig = withPWA(nextConfig);
 } catch (e) {
-  console.log('next-pwa not found, skipping PWA');
+  console.log('PWA skip:', e.message);
 }
 
 module.exports = exportConfig;
