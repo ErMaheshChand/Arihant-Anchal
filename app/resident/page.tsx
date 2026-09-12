@@ -21,7 +21,6 @@ export default function ResidentApp() {
   const [payingId, setPayingId] = useState<string|null>(null)
   const [bookForm, setBookForm] = useState({facility:'', price:0, date: new Date().toISOString().split('T')[0], start:'10:00', end:'12:00'})
   const [myBookings, setMyBookings] = useState<any[]>([])
-  // COMPLAINT STATE
   const [complaints, setComplaints] = useState<any[]>([])
   const [cCat, setCCat] = useState('Safai')
   const [cTitle, setCTitle] = useState('')
@@ -110,15 +109,17 @@ export default function ResidentApp() {
     let photoUrl = ''
     try{
       if(cPhoto){
-        const fname = `${flatNo}_${Date.now()}_${cPhoto.name}`
-        const { error: upErr } = await supabase.storage.from('complaint-photos').upload(fname, cPhoto)
-        if(upErr) throw upErr
-        const { data } = supabase.storage.from('complaint-photos').getPublicUrl(fname)
-        photoUrl = data.publicUrl
+        try{
+          const fname = `${flatNo}_${Date.now()}_${cPhoto.name}`
+          const { error: upErr } = await supabase.storage.from('complaint-photos').upload(fname, cPhoto)
+          if(upErr) throw upErr
+          const { data } = supabase.storage.from('complaint-photos').getPublicUrl(fname)
+          photoUrl = data.publicUrl
+        }catch(e:any){ console.log('bucket skip', e.message) }
       }
       const { error } = await supabase.from('complaints').insert({ flat_no: flatNo, category: cCat, title: cTitle, description: cDesc, photo_url: photoUrl, status:'pending' })
       if(error) throw error
-      alert('✅ Shikayat darj ho gayi - Admin dekhega')
+      alert('✅ Shikayat darj ho gayi')
       setCTitle(''); setCDesc(''); setCPhoto(null); loadComplaints()
     }catch(e:any){ alert('Error: '+e.message) }
     setCUploading(false)
@@ -129,7 +130,7 @@ export default function ResidentApp() {
     const rt = cRating[id]||5
     if(!fb.trim()){ alert('Thank you message likho bhai'); return }
     const { error } = await supabase.from('complaints').update({ feedback: fb, rating: rt, status:'closed' }).eq('id', id)
-    if(!error){ alert('🙏 Dhanyavaad! Feedback bhej diya'); loadComplaints() } else alert(error.message)
+    if(!error){ alert('🙏 Dhanyavaad!'); loadComplaints() } else alert(error.message)
   }
 
   const handleAction = async (id:string, status:'approved'|'rejected'|'inside')=>{
@@ -170,16 +171,14 @@ export default function ResidentApp() {
     const upiLink = `upi://pay?pa=${SOCIETY_UPI}&pn=AnchalSociety&am=${bill.amount}&cu=INR&tn=${encodeURIComponent(bill.title+' '+flatNo)}`
     window.location.href = upiLink
     setTimeout(async()=>{
-      const ok = confirm(`₹${bill.amount} ka payment kiya kya? OK karo to Receipt + Admin Balance update ho jayega`)
+      const ok = confirm(`₹${bill.amount} ka payment kiya kya? OK karo to Receipt download hogi`)
       if(!ok){ setPayingId(null); return }
       const receiptNo = `RCP-${Date.now()}`
       await supabase.from('bills').update({ status:'paid', paid_at: new Date().toISOString(), pay_mode:'UPI', receipt_no: receiptNo }).eq('id',bill.id)
       await supabase.from('society_ledger').insert({ flat_no: flatNo, amount: bill.amount, type: 'credit', title: bill.title, bill_id: bill.id })
       const paidBill = {...bill, status:'paid', paid_at: new Date().toISOString(), pay_mode:'UPI', receipt_no: receiptNo, flat_no: flatNo}
       await downloadReceipt(paidBill)
-      loadBills()
-      alert(`✅ Paid + Receipt Downloaded`)
-      setPayingId(null)
+      loadBills(); alert(`✅ Paid + Receipt Downloaded`); setPayingId(null)
     },2500)
   }
 
@@ -190,21 +189,13 @@ export default function ResidentApp() {
   const totalDue = pendingBills.reduce((s,b)=>s+Number(b.amount),0)
   const totalCollection = ledger.filter(l=>l.type==='credit').reduce((s,l)=>s+Number(l.amount),0)
   const totalCash = cashDeposits.reduce((s,c)=>s+Number(c.amount),0)
-
   const combinedHistory = ledger.map(l=>{
     const receipt = l.title.includes(' - ')? l.title.split(' - ')[1] : ''
     const isCash = l.title.toUpperCase().includes('CASH')
     return { id:l.id, title:l.title, amount:l.amount, created_at:l.created_at, pay_mode:isCash?'CASH':'ONLINE', receipt_no:receipt }
   })
-
-  const facilities = [
-    {name:'Club House', price:1000},
-    {name:'Garden Area', price:1500},
-    {name:'Party Hall', price:2000},
-    {name:'Gym Hall', price:500}
-  ]
+  const facilities = [{name:'Club House', price:1000},{name:'Garden Area', price:1500},{name:'Party Hall', price:2000},{name:'Gym Hall', price:500}]
   const categories = ['Light','Pani','Safai','Parking','Lift','Security','Gardening','Noise','Other']
-
   const statusColor = (s:string)=> s==='pending'?'bg-amber-100 text-amber-700 border-amber-200':s==='in_progress'?'bg-blue-100 text-blue-700 border-blue-200':s==='resolved'?'bg-emerald-100 text-emerald-700 border-emerald-200':'bg-slate-100 text-slate-600 border-slate-200'
 
   return (
@@ -222,7 +213,7 @@ export default function ResidentApp() {
         {tab==='home' && (
           <>
             {pending.length>0 && (
-              <div className="mb-5 space-y-3">
+              <div className="mb-4 space-y-3">
                 <div className="flex items-center gap-2"><span className="text-sm font-bold">🔔 Pending Approval</span><span className="px-2.5 py-0.5 bg-red-500 text-white rounded-full text-xs animate-pulse font-bold">{pending.length} New</span></div>
                 {pending.map(v=>(
                   <div key={v.id} className="p-4 bg-white rounded-3xl border-2 border-amber-200 shadow-sm">
@@ -238,12 +229,52 @@ export default function ResidentApp() {
                 ))}
               </div>
             )}
-            <div className="rounded-3xl bg-slate-900 text-white p-5">
+            <div className="rounded-3xl bg-slate-900 text-white p-5 relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-amber-400/20" />
               <div className="text-xs tracking-widest opacity-60 font-bold">TOTAL PENDING DUE</div>
-              <div className="mt-1 text-2xl font-bold">₹{totalDue || 0}</div>
+              <div className="mt-1 text-3xl font-black">₹{totalDue || 0}</div>
               <div className="text-xs opacity-60 mt-1">Monthly ₹{monthlyDue} + Old ₹{oldDue} + Other ₹{otherDue}</div>
-              <div className="text-xs mt-2 bg-white/10 rounded-full px-3 py-1 inline-block">Ledger Paid (Cash+Online): ₹{totalCollection} (Cash ₹{totalCash})</div>
-              <button onClick={()=>setTab('bills')} className="mt-3 w-full h-10 rounded-full bg-white text-black text-xs font-bold">View & Pay →</button>
+              <div className="text-xs mt-2 bg-white/10 rounded-full px-3 py-1 inline-block">Ledger Paid: ₹{totalCollection} (Cash ₹{totalCash})</div>
+            </div>
+            <div className="mt-4 rounded-3xl bg-gradient-to-br from-blue-600 to-blue-400 text-white p-5">
+              <div className="flex justify-between items-center">
+                <div><div className="font-black text-sm">👤 Visitors — Date wise • {allVisitors.length}</div><div className="text-xs opacity-80 mt-1">Pending {pending.length} • Inside {allVisitors.filter((v:any)=>v.status==='inside').length}</div></div>
+                <button onClick={()=>setTab('visitors')} className="px-4 h-9 rounded-full bg-white text-blue-600 text-xs font-black">Open →</button>
+              </div>
+              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs max-h-28 overflow-y-auto">
+                {allVisitors.slice(0,3).map((v:any)=><div key={v.id} className="flex justify-between py-1 border-b border-white/10 last:border-0"><span>{v.name||v.visitor_name} • {new Date(v.entry_time||v.created_at).toLocaleDateString()}</span><span className="font-bold">{v.status.toUpperCase()}</span></div>)}
+                {allVisitors.length===0 && <div className="opacity-70">No visitors yet</div>}
+              </div>
+            </div>
+            <div className="mt-4 rounded-3xl bg-gradient-to-br from-purple-600 to-fuchsia-500 text-white p-5">
+              <div className="flex justify-between items-center">
+                <div><div className="font-black text-sm">🎭 Book — {myBookings.length} Bookings</div><div className="text-xs opacity-80 mt-1">Pending {myBookings.filter(b=>b.status==='pending').length} • Approved {myBookings.filter(b=>b.status==='approved').length}</div></div>
+                <button onClick={()=>setTab('book')} className="px-4 h-9 rounded-full bg-white text-purple-600 text-xs font-black">Book →</button>
+              </div>
+              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs space-y-1">
+                {myBookings.slice(0,2).map((b:any)=><div key={b.id} className="flex justify-between"><span>{b.facility_name} • {b.booking_date}</span><span className="font-bold">₹{b.amount} • {b.status}</span></div>)}
+                {myBookings.length===0 && <div className="opacity-70">No bookings</div>}
+              </div>
+            </div>
+            <div className="mt-4 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-500 text-white p-5">
+              <div className="flex justify-between items-center">
+                <div><div className="font-black text-sm">💳 Bills — {pendingBills.length} Pending</div><div className="text-xs opacity-80 mt-1">Total Due ₹{totalDue} • Receipts {combinedHistory.length}</div></div>
+                <button onClick={()=>setTab('bills')} className="px-4 h-9 rounded-full bg-white text-emerald-600 text-xs font-black">Pay →</button>
+              </div>
+              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs">
+                {pendingBills.slice(0,2).map(b=><div key={b.id} className="flex justify-between py-1"><span>{b.title}</span><span className="font-black">₹{b.amount}</span></div>)}
+                {pendingBills.length===0 && <div className="opacity-80">🎉 No dues!</div>}
+              </div>
+            </div>
+            <div className="mt-4 rounded-3xl bg-gradient-to-br from-red-600 to-orange-500 text-white p-5 mb-2">
+              <div className="flex justify-between items-center">
+                <div><div className="font-black text-sm">📝 Shikayat — Pending Details • {complaints.length}</div><div className="text-xs opacity-80 mt-1">Pending {complaints.filter(c=>c.status==='pending').length} • In Progress {complaints.filter(c=>c.status==='in_progress').length} • Solved {complaints.filter(c=>c.status==='resolved'||c.status==='closed').length}</div></div>
+                <button onClick={()=>setTab('complaint')} className="px-4 h-9 rounded-full bg-white text-red-600 text-xs font-black">Dekho →</button>
+              </div>
+              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs space-y-1 max-h-32 overflow-y-auto">
+                {complaints.filter(c=>c.status==='pending').slice(0,3).map(c=><div key={c.id} className="flex justify-between"><span>⏳ {c.category} • {c.title.slice(0,22)}</span><span className="font-bold">{new Date(c.created_at).toLocaleDateString()}</span></div>)}
+                {complaints.filter(c=>c.status==='pending').length===0 && <div className="opacity-80">Koi pending shikayat nahi 🎉</div>}
+              </div>
             </div>
           </>
         )}
@@ -257,6 +288,11 @@ export default function ResidentApp() {
               <button onClick={handlePreApprove} className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-sm">Add Pre-Approved →</button>
             </div>
             <div className="mt-6"><div className="flex items-center justify-between"><h3 className="text-sm font-bold">Visitor History</h3><span className="text-xs bg-slate-100 px-2 py-1 rounded-full">{allVisitors.length} records</span></div>
+              <div className="mt-3 p-3 rounded-2xl bg-white border flex gap-2">
+                <div className="flex-1"><div className="text-xs font-bold text-slate-500">From Date</div><input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} className="w-full h-9 rounded-xl bg-slate-50 border px-2 text-xs font-bold" /></div>
+                <div className="flex-1"><div className="text-xs font-bold text-slate-500">To Date</div><input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} className="w-full h-9 rounded-xl bg-slate-50 border px-2 text-xs font-bold" /></div>
+                {(fromDate||toDate) && <button onClick={()=>{setFromDate(''); setToDate('')}} className="self-end h-9 px-3 rounded-xl bg-black text-white text-xs">Clear</button>}
+              </div>
               <div className="mt-3 space-y-2">{allVisitors.map((v:any)=>(<div key={v.id} className="p-3.5 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{v.name || v.visitor_name}</div><div className="text-xs text-slate-500">{new Date(v.entry_time || v.created_at).toLocaleString()}</div></div><div className="text-xs font-black px-2 py-1 rounded-full bg-slate-100">{v.status.toUpperCase()}</div></div>))}</div>
             </div>
           </div>
@@ -267,16 +303,26 @@ export default function ResidentApp() {
             <h2 className="text-lg font-bold">Bills & Maintenance</h2>
             <div className="mt-3 rounded-3xl bg-slate-900 text-white p-5">
               <div className="text-xs tracking-widest opacity-60 font-bold">TOTAL PENDING DUE</div>
-              <div className="mt-1 text-3xl font-bold">₹{totalDue}</div>
+              <div className="mt-1 text-3xl font-black">₹{totalDue}</div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
                 <div className="p-2.5 rounded-2xl bg-white/10"><div className="opacity-60">Monthly</div><div className="font-bold text-sm">₹{monthlyDue}</div></div>
                 <div className="p-2.5 rounded-2xl bg-white/10"><div className="opacity-60">Old Due</div><div className="font-bold text-sm">₹{oldDue}</div></div>
                 <div className="p-2.5 rounded-2xl bg-white/10"><div className="opacity-60">Other</div><div className="font-bold text-sm">₹{otherDue}</div></div>
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-sm font-bold">Pending Bills</div>
+            <div className="mt-3 p-3 rounded-2xl bg-white border flex gap-2">
+              <div className="flex-1"><div className="text-xs font-bold text-slate-500">From</div><input type="date" value={billFrom} onChange={e=>setBillFrom(e.target.value)} className="w-full h-9 rounded-xl bg-slate-50 border px-2 text-xs font-bold" /></div>
+              <div className="flex-1"><div className="text-xs font-bold text-slate-500">To</div><input type="date" value={billTo} onChange={e=>setBillTo(e.target.value)} className="w-full h-9 rounded-xl bg-slate-50 border px-2 text-xs font-bold" /></div>
+              {(billFrom||billTo) && <button onClick={()=>{setBillFrom(''); setBillTo('')}} className="self-end h-9 px-3 rounded-xl bg-black text-white text-xs">Clear</button>}
+            </div>
+            <div className="mt-4"><div className="text-sm font-bold">Pending Bills</div>
               <div className="mt-2 space-y-2">{pendingBills.length===0? <div className="p-4 rounded-2xl bg-white border text-xs text-center">No dues 🎉</div> : pendingBills.map(b=>(<div key={b.id} className="p-4 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{b.title}</div><div className="text-xs text-slate-500">Due: {b.due_date} • {b.type}</div></div><div className="text-right"><div className="font-black text-sm">₹{b.amount}</div><button disabled={payingId===b.id} onClick={()=>handlePay(b)} className="mt-1 px-4 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold">{payingId===b.id?'...':'Pay UPI'}</button></div></div>))}</div>
+            </div>
+            <div className="mt-6">
+              <div className="flex justify-between items-center"><div className="text-sm font-bold">Payment History</div><div className="text-xs bg-black text-white px-2 py-1 rounded-full">{combinedHistory.length} receipts</div></div>
+              <div className="mt-3 rounded-3xl bg-white border overflow-hidden">
+                <div className="max-h-96 overflow-y-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-900 text-white"><tr><th className="text-left p-3">Date</th><th className="text-left p-3">Title</th><th className="text-right p-3">Amt</th><th className="text-right p-3">PDF</th></tr></thead><tbody>{combinedHistory.map((h:any)=>(<tr key={h.id} className="border-b"><td className="p-3">{new Date(h.created_at).toLocaleDateString()}</td><td className="p-3">{h.title}<div className="text-[10px] font-bold">{h.pay_mode}</div></td><td className="p-3 text-right font-bold">₹{h.amount}</td><td className="p-3 text-right"><button onClick={()=>downloadReceipt(h)} className="px-3 py-1 rounded-full bg-black text-white text-xs">PDF</button></td></tr>))}</tbody></table></div>
+              </div>
             </div>
           </div>
         )}
@@ -285,13 +331,7 @@ export default function ResidentApp() {
           <div>
             <h2 className="text-lg font-bold">Book Facility 🎭</h2>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {facilities.map((f,i)=>(
-                <button key={i} onClick={()=>setBookForm({...bookForm, facility:f.name, price:f.price})}
-                  className={`p-4 rounded-3xl border-2 text-left ${bookForm.facility===f.name?'bg-slate-900 text-white border-slate-900':'bg-white border-slate-200'}`}>
-                  <div className="font-bold text-sm">{f.name}</div>
-                  <div className="text-xs opacity-60">₹{f.price}/hr</div>
-                </button>
-              ))}
+              {facilities.map((f,i)=>(<button key={i} onClick={()=>setBookForm({...bookForm, facility:f.name, price:f.price})} className={`p-4 rounded-3xl border-2 text-left ${bookForm.facility===f.name?'bg-slate-900 text-white border-slate-900':'bg-white border-slate-200'}`}><div className="font-bold text-sm">{f.name}</div><div className="text-xs opacity-60">₹{f.price}/hr</div></button>))}
             </div>
             <div className="mt-4 p-4 rounded-3xl bg-white border space-y-3">
               <div className="grid grid-cols-3 gap-2">
@@ -301,16 +341,8 @@ export default function ResidentApp() {
               </div>
               <button onClick={handleBooking} className="w-full h-12 rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-bold text-sm">Book Now → Admin Approval</button>
             </div>
-            <div className="mt-5">
-              <div className="text-sm font-bold flex justify-between"><span>My Bookings</span><span className="text-xs bg-black text-white px-2 py-1 rounded-full">{myBookings.length}</span></div>
-              <div className="mt-2 space-y-2">
-                {myBookings.map((b:any)=>(
-                  <div key={b.id} className="p-3 rounded-2xl bg-white border flex justify-between items-center">
-                    <div><div className="font-bold text-sm">{b.facility_name}</div><div className="text-xs opacity-60">{b.booking_date} {b.start_time}-{b.end_time} • ₹{b.amount}</div></div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${b.status==='approved'?'bg-emerald-50 text-emerald-700 border border-emerald-200':b.status==='pending'?'bg-amber-50 text-amber-700 border border-amber-200':'bg-red-50 text-red-700 border'}`}>{b.status.toUpperCase()}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-5"><div className="text-sm font-bold flex justify-between"><span>My Bookings</span><span className="text-xs bg-black text-white px-2 py-1 rounded-full">{myBookings.length}</span></div>
+              <div className="mt-2 space-y-2">{myBookings.map((b:any)=>(<div key={b.id} className="p-3 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{b.facility_name}</div><div className="text-xs opacity-60">{b.booking_date} {b.start_time}-{b.end_time} • ₹{b.amount}</div></div><span className={`text-xs px-2 py-1 rounded-full font-bold ${b.status==='approved'?'bg-emerald-50 text-emerald-700 border border-emerald-200':'bg-amber-50 text-amber-700 border border-amber-200'}`}>{b.status.toUpperCase()}</span></div>))}</div>
             </div>
           </div>
         )}
@@ -319,54 +351,23 @@ export default function ResidentApp() {
           <div>
             <div className="rounded-3xl bg-gradient-to-r from-slate-900 to-slate-700 text-white p-5">
               <h2 className="text-lg font-black">📝 Shikayat / Complaint</h2>
-              <div className="text-xs opacity-70 mt-1">Light • Pani • Safai • Parking • Lift — photo ke saath bhejo, track karo</div>
-              <div className="mt-2 flex gap-2 text-xs">
+              <div className="text-xs opacity-70 mt-1">Light • Pani • Safai • Parking • Lift — photo ke saath bhejo</div>
+              <div className="mt-2 flex gap-2 text-xs flex-wrap">
                 <span className="px-2 py-1 bg-amber-400 text-black rounded-full font-bold">{complaints.filter(c=>c.status==='pending').length} Pending</span>
                 <span className="px-2 py-1 bg-blue-400 text-white rounded-full font-bold">{complaints.filter(c=>c.status==='in_progress').length} Kaam chal raha</span>
                 <span className="px-2 py-1 bg-emerald-400 text-black rounded-full font-bold">{complaints.filter(c=>c.status==='resolved'||c.status==='closed').length} Solved</span>
               </div>
             </div>
-
             <div className="mt-4 p-5 rounded-3xl bg-white border shadow-sm space-y-3">
-              <div className="text-sm font-black">➕ Nayi Shikayat Darj Karo</div>
-              <div className="grid grid-cols-3 gap-2">
-                {categories.map(cat=>(
-                  <button key={cat} onClick={()=>setCCat(cat)} className={`h-10 rounded-full text-xs font-bold border ${cCat===cat?'bg-slate-900 text-white border-slate-900':'bg-slate-50'}`}>{cat==='Light'?'💡 Light':cat==='Pani'?'💧 Pani':cat==='Safai'?'🧹 Safai':cat==='Parking'?'🚗 Parking':cat}</button>
-                ))}
-              </div>
+              <div className="text-sm font-black">➕ Nayi Shikayat</div>
+              <div className="grid grid-cols-3 gap-2">{categories.map(cat=>(<button key={cat} onClick={()=>setCCat(cat)} className={`h-10 rounded-full text-xs font-bold border ${cCat===cat?'bg-slate-900 text-white border-slate-900':'bg-slate-50'}`}>{cat}</button>))}</div>
               <input value={cTitle} onChange={e=>setCTitle(e.target.value)} placeholder="Title * (jaise: Corridor light kharab)" className="w-full h-12 rounded-2xl bg-slate-50 border px-4 text-sm font-bold" />
-              <textarea value={cDesc} onChange={e=>setCDesc(e.target.value)} placeholder="Detail likho... (floor, location)" rows={3} className="w-full rounded-2xl bg-slate-50 border px-4 py-3 text-sm" />
-              <label className="block p-4 rounded-2xl border-2 border-dashed border-slate-200 text-center cursor-pointer">
-                <input type="file" accept="image/*" className="hidden" onChange={e=>setCPhoto(e.target.files?.[0]||null)} />
-                <div className="text-2xl">📸</div>
-                <div className="text-xs font-bold mt-1">{cPhoto? cPhoto.name : 'Photo upload karo (saboot ke liye)'}</div>
-              </label>
-              <button disabled={cUploading} onClick={handleComplaintSubmit} className="w-full h-12 rounded-full bg-red-600 text-white font-black text-sm">{cUploading?'Upload ho raha...':'🚨 Shikayat Bhejo'}</button>
+              <textarea value={cDesc} onChange={e=>setCDesc(e.target.value)} placeholder="Detail likho..." rows={3} className="w-full rounded-2xl bg-slate-50 border px-4 py-3 text-sm" />
+              <label className="block p-4 rounded-2xl border-2 border-dashed border-slate-200 text-center cursor-pointer"><input type="file" accept="image/*" className="hidden" onChange={e=>setCPhoto(e.target.files?.[0]||null)} /><div className="text-2xl">📸</div><div className="text-xs font-bold mt-1">{cPhoto? cPhoto.name : 'Photo upload karo'}</div></label>
+              <button disabled={cUploading} onClick={handleComplaintSubmit} className="w-full h-12 rounded-full bg-red-600 text-white font-black text-sm">{cUploading?'Upload...':'🚨 Shikayat Bhejo'}</button>
             </div>
-
-            <div className="mt-5">
-              <div className="text-sm font-black">📋 Meri Shikayatein — Track karo</div>
-              <div className="mt-2 space-y-3">
-                {complaints.map(c=>(
-                  <div key={c.id} className="p-4 rounded-3xl bg-white border shadow-sm">
-                    <div className="flex justify-between items-start">
-                      <div><div className="font-bold text-sm">{c.category} • {c.title}</div><div className="text-xs opacity-60 mt-0.5">{new Date(c.created_at).toLocaleString()} • {c.description}</div></div>
-                      <span className={`text-[10px] px-2 py-1 rounded-full font-black border ${statusColor(c.status)}`}>{c.status==='pending'?'⏳ PENDING':c.status==='in_progress'?'🔧 KAAM CHAL RAHA':c.status==='resolved'?'✅ SOLVED':'🙏 CLOSED'}</span>
-                    </div>
-                    {c.photo_url && <img src={c.photo_url} className="mt-2 w-full h-40 object-cover rounded-2xl" />}
-                    {c.status==='resolved' && (
-                      <div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
-                        <div className="text-xs font-black text-emerald-700">🎉 Kaam ho gaya! Thank you bolo:</div>
-                        <div className="mt-2 flex gap-1">{[1,2,3,4,5].map(s=>(<button key={s} onClick={()=>setCRating({...cRating, [c.id]:s})} className="text-xl">{(cRating[c.id]||5)>=s?'⭐':'☆'}</button>))}</div>
-                        <input value={cFeedback[c.id]||''} onChange={e=>setCFeedback({...cFeedback, [c.id]:e.target.value})} placeholder="Dhanyavaad likho..." className="mt-2 w-full h-10 rounded-xl border px-3 text-xs" />
-                        <button onClick={()=>handleThankYou(c.id)} className="mt-2 w-full h-10 rounded-full bg-emerald-600 text-white text-xs font-black">🙏 Thank You + Feedback Bhejo</button>
-                      </div>
-                    )}
-                    {c.feedback && <div className="mt-2 p-2 rounded-xl bg-slate-50 text-xs">⭐ {c.rating}/5 — "{c.feedback}"</div>}
-                  </div>
-                ))}
-                {complaints.length===0 && <div className="p-8 text-center text-xs opacity-40 bg-white rounded-3xl border">Koi shikayat nahi — upar se darj karo</div>}
-              </div>
+            <div className="mt-5"><div className="text-sm font-black">📋 Meri Shikayatein</div>
+              <div className="mt-2 space-y-3">{complaints.map(c=>(<div key={c.id} className="p-4 rounded-3xl bg-white border shadow-sm"><div className="flex justify-between items-start"><div><div className="font-bold text-sm">{c.category} • {c.title}</div><div className="text-xs opacity-60 mt-0.5">{new Date(c.created_at).toLocaleString()}</div></div><span className={`text-[10px] px-2 py-1 rounded-full font-black border ${statusColor(c.status)}`}>{c.status.toUpperCase()}</span></div>{c.photo_url && <img src={c.photo_url} className="mt-2 w-full h-40 object-cover rounded-2xl" />}{c.status==='resolved' && (<div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200"><div className="text-xs font-black text-emerald-700">🎉 Kaam ho gaya! Thank you bolo:</div><div className="mt-2 flex gap-1">{[1,2,3,4,5].map(s=>(<button key={s} onClick={()=>setCRating({...cRating, [c.id]:s})} className="text-xl">{(cRating[c.id]||5)>=s?'⭐':'☆'}</button>))}</div><input value={cFeedback[c.id]||''} onChange={e=>setCFeedback({...cFeedback, [c.id]:e.target.value})} placeholder="Dhanyavaad likho..." className="mt-2 w-full h-10 rounded-xl border px-3 text-xs" /><button onClick={()=>handleThankYou(c.id)} className="mt-2 w-full h-10 rounded-full bg-emerald-600 text-white text-xs font-black">🙏 Thank You Bhejo</button></div>)}{c.feedback && <div className="mt-2 p-2 rounded-xl bg-slate-50 text-xs">⭐ {c.rating}/5 — "{c.feedback}"</div>}</div>))}</div>
             </div>
           </div>
         )}
