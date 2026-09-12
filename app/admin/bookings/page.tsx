@@ -30,15 +30,18 @@ export default function AdminBookingDashboard(){
 
   const approve = async ()=>{
     if(!selected) return
-    // Rule: Due > 5000 to warning, but allow with confirm
     if(dueInfo?.totalDue > 5000){
       const ok = confirm(`⚠️ ${selected.flat_no} ka Due ₹${dueInfo.totalDue} hai (>5000). Phir bhi Approve karna hai?`)
       if(!ok) return
     }
-    await supabase.from('bookings').update({ status:'approved', approved_at: new Date().toISOString() }).eq('id', selected.id)
-    // Auto bill add
+    // FIX: sirf status update karo, approved_at hata diya
+    const { data: up, error: e1 } = await supabase.from('bookings').update({ status:'approved' }).eq('id', selected.id).select('id')
+    if(e1){ alert('Update Error: '+e1.message); return }
+    if(!up || up.length===0){
+      // id match na ho to flat+date se
+      await supabase.from('bookings').update({ status:'approved' }).eq('flat_no', selected.flat_no).eq('booking_date', selected.booking_date).eq('facility_name', selected.facility_name).eq('status','pending')
+    }
     await supabase.from('bills').insert({ flat_no: selected.flat_no, title: `${selected.facility_name} Booking ${selected.booking_date}`, amount: selected.amount, type:'other', due_date: selected.booking_date, status:'pending' })
-    // History log
     try { await supabase.from('booking_history').insert({ booking_id: selected.id, flat_no: selected.flat_no, action:'approved', by:'admin', note:`Due Rs.${dueInfo?.totalDue} checked - OK` }) } catch(e){}
     alert(`✅ Approved ${selected.flat_no} - Bill ₹${selected.amount} Added`)
     setSelected(null); setDueInfo(null); load()
@@ -74,8 +77,6 @@ export default function AdminBookingDashboard(){
   return (
     <div className="min-h-screen bg-[#f8fafc] p-2 md:p-4 text-black">
       <div className="max-w-7xl mx-auto space-y-3">
-
-        {/* HEADER */}
         <div className="bg-white rounded-2xl border shadow-sm p-4 flex flex-wrap justify-between items-center gap-3">
           <div>
             <h1 className="font-black text-lg">🏛️ Clubhouse & Lawn Booking Dashboard</h1>
@@ -86,10 +87,8 @@ export default function AdminBookingDashboard(){
             <button onClick={downloadExcel} className="px-4 h-10 rounded-full bg-emerald-600 text-white text-xs font-black">📥 Excel Download ({filtered.length})</button>
           </div>
         </div>
-
-        {/* SEARCH - MULTIPLE */}
         <div className="bg-white rounded-2xl border shadow-sm p-4">
-          <div className="text- font-black tracking-widest opacity-60">MULTIPLE SEARCH - BADI LIST SHORT KARO</div>
+          <div className="text-xs font-black tracking-widest opacity-60">MULTIPLE SEARCH - BADI LIST SHORT KARO</div>
           <div className="mt-2 grid grid-cols-2 md:grid-cols-6 gap-2">
             <input value={fFlat} onChange={e=>setFFlat(e.target.value)} placeholder="🔍 Flat No (B-302)" className="h-11 rounded-xl border bg-slate-50 px-3 text-sm font-bold" />
             <input value={fFacility} onChange={e=>setFFacility(e.target.value)} placeholder="🔍 Facility (Club/Lawn)" className="h-11 rounded-xl border bg-slate-50 px-3 text-sm" />
@@ -100,31 +99,27 @@ export default function AdminBookingDashboard(){
             <input type="date" value={fTo} onChange={e=>setFTo(e.target.value)} className="h-11 rounded-xl border bg-slate-50 px-2 text-xs" />
             <button onClick={()=>{setFFlat(''); setFFacility(''); setFStatus(''); setFFrom(''); setFTo('')}} className="h-11 rounded-xl bg-black text-white text-xs font-bold">Clear</button>
           </div>
-          <div className="mt-2 text- font-bold">Showing {filtered.length} / {bookings.length} bookings</div>
+          <div className="mt-2 text-xs font-bold">Showing {filtered.length} / {bookings.length} bookings</div>
         </div>
-
-        {/* BOOKING LIST */}
         <div className="bg-white rounded-2xl border shadow-sm p-4">
           <div className="font-bold text-sm mb-3">All Requests - Resident se aayi hui</div>
-          <div className="space-y-2 max-h- overflow-y-auto">
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {filtered.map(b=>(
               <div key={b.id} onClick={()=>checkDue(b)} className={`p-4 rounded-2xl border cursor-pointer hover:shadow-md transition ${selected?.id===b.id?'border-black border-2 bg-slate-50':'bg-white'}`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-bold text-sm">{b.facility_name} • <span className="text-blue-600">{b.flat_no}</span></div>
                     <div className="text-xs opacity-60 mt-0.5">📅 {b.booking_date} ⏰ {b.start_time}-{b.end_time} • {b.hours}hr • <b className="text-black">₹{b.amount}</b></div>
-                    <div className="text- opacity-40">Request: {new Date(b.created_at).toLocaleString()}</div>
+                    <div className="text-[10px] opacity-40">Request: {new Date(b.created_at).toLocaleString()}</div>
                   </div>
-                  <span className={`text- px-3 py-1 rounded-full font-black ${b.status==='pending'?'bg-amber-100 text-amber-700 border border-amber-200 animate-pulse':b.status==='approved'?'bg-emerald-100 text-emerald-700 border border-emerald-200':'bg-red-100 text-red-700 border'}`}>{b.status.toUpperCase()}</span>
+                  <span className={`text-xs px-3 py-1 rounded-full font-black ${b.status==='pending'?'bg-amber-100 text-amber-700 border border-amber-200 animate-pulse':b.status==='approved'?'bg-emerald-100 text-emerald-700 border border-emerald-200':'bg-red-100 text-red-700 border'}`}>{b.status.toUpperCase()}</span>
                 </div>
               </div>
             ))}
             {filtered.length===0 && <div className="p-8 text-center text-xs opacity-40">Koi booking nahi mili - Search clear karo</div>}
           </div>
-          <div className="mt-2 p-2 bg-slate-50 rounded-xl text- text-center font-bold">↕️ Scroll karo • Click karke Due check karo</div>
+          <div className="mt-2 p-2 bg-slate-50 rounded-xl text-xs text-center font-bold">↕️ Scroll karo • Click karke Due check karo</div>
         </div>
-
-        {/* DUE CHECK + APPROVE PANEL */}
         {selected && (
           <div className="bg-white rounded-2xl border-2 border-black shadow-lg p-4 sticky bottom-2">
             <div className="flex justify-between items-start">
@@ -134,30 +129,26 @@ export default function AdminBookingDashboard(){
               </div>
               <button onClick={()=>{setSelected(null); setDueInfo(null)}} className="w-8 h-8 rounded-full bg-slate-100 font-bold">✕</button>
             </div>
-
             {dueInfo? (
               <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div className={`p-3 rounded-2xl border ${dueInfo.totalDue>0?'bg-red-50 border-red-200':'bg-emerald-50 border-emerald-200'}`}>
-                  <div className="text- font-bold opacity-60">TOTAL DUE</div><div className={`font-black ${dueInfo.totalDue>0?'text-red-600':'text-emerald-600'}`}>₹{dueInfo.totalDue}</div>
+                  <div className="text-[10px] font-bold opacity-60">TOTAL DUE</div><div className={`font-black ${dueInfo.totalDue>0?'text-red-600':'text-emerald-600'}`}>₹{dueInfo.totalDue}</div>
                 </div>
                 <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200">
-                  <div className="text- font-bold opacity-60">TOTAL PAID</div><div className="font-black text-blue-700">₹{dueInfo.totalPaid}</div>
+                  <div className="text-[10px] font-bold opacity-60">TOTAL PAID</div><div className="font-black text-blue-700">₹{dueInfo.totalPaid}</div>
                 </div>
                 <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200">
-                  <div className="text- font-bold opacity-60">ADVANCE</div><div className="font-black">₹{dueInfo.advance}</div>
+                  <div className="text-[10px] font-bold opacity-60">ADVANCE</div><div className="font-black">₹{dueInfo.advance}</div>
                 </div>
                 <div className="p-3 rounded-2xl bg-slate-50 border">
-                  <div className="text- font-bold opacity-60">RESIDENT</div><div className="font-bold text-xs">{dueInfo.name}<div className="opacity-60">{dueInfo.mobile}</div></div>
+                  <div className="text-[10px] font-bold opacity-60">RESIDENT</div><div className="font-bold text-xs">{dueInfo.name}<div className="opacity-60">{dueInfo.mobile}</div></div>
                 </div>
               </div>
             ) : <div className="mt-3 text-xs">Checking due...</div>}
-
-            {/* RULE */}
             <div className="mt-3 p-3 rounded-2xl bg-slate-900 text-white text-xs">
-              <b>Rule:</b> Due ₹0 = ✅ Auto OK | Due ₹1-5000 = ⚠️ Warning | Due &gt;5000 = ❌ Confirm chahiye | Advance me paisa hai to adjust ho sakta hai
+              <b>Rule:</b> Due ₹0 = ✅ Auto OK | Due ₹1-5000 = ⚠️ Warning | Due &gt;5000 = ❌ Confirm chahiye
               {dueInfo && <div className="mt-1 font-bold">{dueInfo.totalDue===0?'✅ SAB OK HAI - Approve kar sakte ho':dueInfo.totalDue>5000?'❌ JYADA DUE HAI - Soch ke approve karo':'⚠️ THODA DUE HAI - Dekh lo'}</div>}
             </div>
-
             {selected.status==='pending'? (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button onClick={reject} className="h-12 rounded-full bg-red-50 text-red-700 border border-red-200 font-black text-sm">❌ Reject</button>
@@ -168,7 +159,6 @@ export default function AdminBookingDashboard(){
             )}
           </div>
         )}
-
       </div>
     </div>
   )
