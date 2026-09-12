@@ -29,6 +29,9 @@ export default function ResidentApp() {
   const [cUploading, setCUploading] = useState(false)
   const [cFeedback, setCFeedback] = useState<{[k:string]:string}>({})
   const [cRating, setCRating] = useState<{[k:string]:number}>({})
+  const [empList,setEmpList]=useState<any[]>([])
+  const [empCode,setEmpCode]=useState('')
+  const [empComps,setEmpComps]=useState<any[]>([])
   const audioRef = useRef<HTMLAudioElement>(null)
   const beepInterval = useRef<any>(null)
   const SOCIETY_UPI = 'anchalsociety@okicici'
@@ -82,16 +85,23 @@ export default function ResidentApp() {
     const { data } = await supabase.from('complaints').select('*').eq('flat_no', flatNo).order('created_at',{ascending:false})
     if(data) setComplaints(data)
   }
+  const loadEmpComplaints = async ()=>{
+    const {data:e}=await supabase.from('employees').select('employee_code,name,job_title').eq('status','approved')
+    if(e) setEmpList(e)
+    const {data:ec}=await supabase.from('employee_complaints').select('*').eq('complaint_by_flat',flatNo).order('created_at',{ascending:false})
+    if(ec) setEmpComps(ec)
+  }
 
   useEffect(()=>{
     if(!flatNo) return
-    loadVisitors(); loadBills(); loadBookings(); loadComplaints()
+    loadVisitors(); loadBills(); loadBookings(); loadComplaints(); loadEmpComplaints()
     const ch = supabase.channel('resident-'+flatNo).on('postgres_changes', {event:'*', schema:'public', table:'visitors', filter:`resident_flat=eq.${flatNo}`}, ()=>loadVisitors()).subscribe()
     const ch2 = supabase.channel('emergency-resident').on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{ const data = payload.new as any; if(data.target === 'ALL'){ setEmergencyAlert(data); startBeep() } }).subscribe()
     const ch3 = supabase.channel('bills-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'bills', filter:`flat_no=eq.${flatNo}`},()=>loadBills()).subscribe()
     const ch6 = supabase.channel('book-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'bookings', filter:`flat_no=eq.${flatNo}`},()=>loadBookings()).subscribe()
     const ch7 = supabase.channel('comp-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'complaints', filter:`flat_no=eq.${flatNo}`},()=>loadComplaints()).subscribe()
-    return ()=>{ supabase.removeChannel(ch); supabase.removeChannel(ch2); supabase.removeChannel(ch3); supabase.removeChannel(ch6); supabase.removeChannel(ch7); if(beepInterval.current) clearInterval(beepInterval.current) }
+    const ch8 = supabase.channel('empcomp-'+flatNo).on('postgres_changes',{event:'*', schema:'public', table:'employee_complaints', filter:`complaint_by_flat=eq.${flatNo}`},()=>loadEmpComplaints()).subscribe()
+    return ()=>{ supabase.removeChannel(ch); supabase.removeChannel(ch2); supabase.removeChannel(ch3); supabase.removeChannel(ch6); supabase.removeChannel(ch7); supabase.removeChannel(ch8); if(beepInterval.current) clearInterval(beepInterval.current) }
   },[flatNo])
   useEffect(()=>{ if(flatNo) loadVisitors() },[fromDate,toDate])
   useEffect(()=>{ if(flatNo) loadBills() },[billFrom,billTo])
@@ -104,6 +114,14 @@ export default function ResidentApp() {
   }
 
   const handleComplaintSubmit = async ()=>{
+    if(cCat==='Employee'){
+      if(!empCode){ alert('Employee select karo bhai'); return }
+      if(!cTitle.trim()){ alert('Title likho bhai'); return }
+      const { error } = await supabase.from('employee_complaints').insert({ employee_code: empCode, complaint_by_flat: flatNo, category: 'Employee', description: cTitle+' - '+cDesc, status:'pending' })
+      if(error){ alert(error.message); return }
+      alert('✅ Employee Complaint bhej di — Admin Verify page par chali gayi')
+      setCTitle(''); setCDesc(''); setEmpCode(''); loadEmpComplaints(); return
+    }
     if(!cTitle.trim()){ alert('Shikayat ka title likho bhai'); return }
     setCUploading(true)
     let photoUrl = ''
@@ -195,7 +213,7 @@ export default function ResidentApp() {
     return { id:l.id, title:l.title, amount:l.amount, created_at:l.created_at, pay_mode:isCash?'CASH':'ONLINE', receipt_no:receipt }
   })
   const facilities = [{name:'Club House', price:1000},{name:'Garden Area', price:1500},{name:'Party Hall', price:2000},{name:'Gym Hall', price:500}]
-  const categories = ['Light','Pani','Safai','Parking','Lift','Security','Gardening','Noise','Other']
+  const categories = ['Light','Pani','Safai','Parking','Lift','Security','Gardening','Noise','Employee','Other']
   const statusColor = (s:string)=> s==='pending'?'bg-amber-100 text-amber-700 border-amber-200':s==='in_progress'?'bg-blue-100 text-blue-700 border-blue-200':s==='resolved'?'bg-emerald-100 text-emerald-700 border-emerald-200':'bg-slate-100 text-slate-600 border-slate-200'
 
   return (
@@ -238,42 +256,26 @@ export default function ResidentApp() {
             </div>
             <div className="mt-4 rounded-3xl bg-gradient-to-br from-blue-600 to-blue-400 text-white p-5">
               <div className="flex justify-between items-center">
-                <div><div className="font-black text-sm">👤 Visitors — Date wise • {allVisitors.length}</div><div className="text-xs opacity-80 mt-1">Pending {pending.length} • Inside {allVisitors.filter((v:any)=>v.status==='inside').length}</div></div>
+                <div><div className="font-black text-sm">👤 Visitors • {allVisitors.length}</div><div className="text-xs opacity-80 mt-1">Pending {pending.length}</div></div>
                 <button onClick={()=>setTab('visitors')} className="px-4 h-9 rounded-full bg-white text-blue-600 text-xs font-black">Open →</button>
-              </div>
-              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs max-h-28 overflow-y-auto">
-                {allVisitors.slice(0,3).map((v:any)=><div key={v.id} className="flex justify-between py-1 border-b border-white/10 last:border-0"><span>{v.name||v.visitor_name} • {new Date(v.entry_time||v.created_at).toLocaleDateString()}</span><span className="font-bold">{v.status.toUpperCase()}</span></div>)}
-                {allVisitors.length===0 && <div className="opacity-70">No visitors yet</div>}
               </div>
             </div>
             <div className="mt-4 rounded-3xl bg-gradient-to-br from-purple-600 to-fuchsia-500 text-white p-5">
               <div className="flex justify-between items-center">
-                <div><div className="font-black text-sm">🎭 Book — {myBookings.length} Bookings</div><div className="text-xs opacity-80 mt-1">Pending {myBookings.filter(b=>b.status==='pending').length} • Approved {myBookings.filter(b=>b.status==='approved').length}</div></div>
+                <div><div className="font-black text-sm">🎭 Book — {myBookings.length}</div></div>
                 <button onClick={()=>setTab('book')} className="px-4 h-9 rounded-full bg-white text-purple-600 text-xs font-black">Book →</button>
-              </div>
-              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs space-y-1">
-                {myBookings.slice(0,2).map((b:any)=><div key={b.id} className="flex justify-between"><span>{b.facility_name} • {b.booking_date}</span><span className="font-bold">₹{b.amount} • {b.status}</span></div>)}
-                {myBookings.length===0 && <div className="opacity-70">No bookings</div>}
               </div>
             </div>
             <div className="mt-4 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-500 text-white p-5">
               <div className="flex justify-between items-center">
-                <div><div className="font-black text-sm">💳 Bills — {pendingBills.length} Pending</div><div className="text-xs opacity-80 mt-1">Total Due ₹{totalDue} • Receipts {combinedHistory.length}</div></div>
+                <div><div className="font-black text-sm">💳 Bills — {pendingBills.length} Pending</div><div className="text-xs opacity-80 mt-1">Total Due ₹{totalDue}</div></div>
                 <button onClick={()=>setTab('bills')} className="px-4 h-9 rounded-full bg-white text-emerald-600 text-xs font-black">Pay →</button>
-              </div>
-              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs">
-                {pendingBills.slice(0,2).map(b=><div key={b.id} className="flex justify-between py-1"><span>{b.title}</span><span className="font-black">₹{b.amount}</span></div>)}
-                {pendingBills.length===0 && <div className="opacity-80">🎉 No dues!</div>}
               </div>
             </div>
             <div className="mt-4 rounded-3xl bg-gradient-to-br from-red-600 to-orange-500 text-white p-5 mb-2">
               <div className="flex justify-between items-center">
-                <div><div className="font-black text-sm">📝 Shikayat — Pending Details • {complaints.length}</div><div className="text-xs opacity-80 mt-1">Pending {complaints.filter(c=>c.status==='pending').length} • In Progress {complaints.filter(c=>c.status==='in_progress').length} • Solved {complaints.filter(c=>c.status==='resolved'||c.status==='closed').length}</div></div>
+                <div><div className="font-black text-sm">📝 Shikayat • {complaints.length+empComps.length}</div><div className="text-xs opacity-80 mt-1">Society {complaints.filter(c=>c.status==='pending').length} + Emp {empComps.filter(c=>c.status==='pending').length} Pending</div></div>
                 <button onClick={()=>setTab('complaint')} className="px-4 h-9 rounded-full bg-white text-red-600 text-xs font-black">Dekho →</button>
-              </div>
-              <div className="mt-3 bg-white/10 rounded-2xl p-3 text-xs space-y-1 max-h-32 overflow-y-auto">
-                {complaints.filter(c=>c.status==='pending').slice(0,3).map(c=><div key={c.id} className="flex justify-between"><span>⏳ {c.category} • {c.title.slice(0,22)}</span><span className="font-bold">{new Date(c.created_at).toLocaleDateString()}</span></div>)}
-                {complaints.filter(c=>c.status==='pending').length===0 && <div className="opacity-80">Koi pending shikayat nahi 🎉</div>}
               </div>
             </div>
           </>
@@ -310,19 +312,8 @@ export default function ResidentApp() {
                 <div className="p-2.5 rounded-2xl bg-white/10"><div className="opacity-60">Other</div><div className="font-bold text-sm">₹{otherDue}</div></div>
               </div>
             </div>
-            <div className="mt-3 p-3 rounded-2xl bg-white border flex gap-2">
-              <div className="flex-1"><div className="text-xs font-bold text-slate-500">From</div><input type="date" value={billFrom} onChange={e=>setBillFrom(e.target.value)} className="w-full h-9 rounded-xl bg-slate-50 border px-2 text-xs font-bold" /></div>
-              <div className="flex-1"><div className="text-xs font-bold text-slate-500">To</div><input type="date" value={billTo} onChange={e=>setBillTo(e.target.value)} className="w-full h-9 rounded-xl bg-slate-50 border px-2 text-xs font-bold" /></div>
-              {(billFrom||billTo) && <button onClick={()=>{setBillFrom(''); setBillTo('')}} className="self-end h-9 px-3 rounded-xl bg-black text-white text-xs">Clear</button>}
-            </div>
             <div className="mt-4"><div className="text-sm font-bold">Pending Bills</div>
-              <div className="mt-2 space-y-2">{pendingBills.length===0? <div className="p-4 rounded-2xl bg-white border text-xs text-center">No dues 🎉</div> : pendingBills.map(b=>(<div key={b.id} className="p-4 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{b.title}</div><div className="text-xs text-slate-500">Due: {b.due_date} • {b.type}</div></div><div className="text-right"><div className="font-black text-sm">₹{b.amount}</div><button disabled={payingId===b.id} onClick={()=>handlePay(b)} className="mt-1 px-4 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold">{payingId===b.id?'...':'Pay UPI'}</button></div></div>))}</div>
-            </div>
-            <div className="mt-6">
-              <div className="flex justify-between items-center"><div className="text-sm font-bold">Payment History</div><div className="text-xs bg-black text-white px-2 py-1 rounded-full">{combinedHistory.length} receipts</div></div>
-              <div className="mt-3 rounded-3xl bg-white border overflow-hidden">
-                <div className="max-h-96 overflow-y-auto"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-900 text-white"><tr><th className="text-left p-3">Date</th><th className="text-left p-3">Title</th><th className="text-right p-3">Amt</th><th className="text-right p-3">PDF</th></tr></thead><tbody>{combinedHistory.map((h:any)=>(<tr key={h.id} className="border-b"><td className="p-3">{new Date(h.created_at).toLocaleDateString()}</td><td className="p-3">{h.title}<div className="text-[10px] font-bold">{h.pay_mode}</div></td><td className="p-3 text-right font-bold">₹{h.amount}</td><td className="p-3 text-right"><button onClick={()=>downloadReceipt(h)} className="px-3 py-1 rounded-full bg-black text-white text-xs">PDF</button></td></tr>))}</tbody></table></div>
-              </div>
+              <div className="mt-2 space-y-2">{pendingBills.map(b=>(<div key={b.id} className="p-4 rounded-2xl bg-white border flex justify-between items-center"><div><div className="font-bold text-sm">{b.title}</div><div className="text-xs text-slate-500">Due: {b.due_date}</div></div><div className="text-right"><div className="font-black text-sm">₹{b.amount}</div><button disabled={payingId===b.id} onClick={()=>handlePay(b)} className="mt-1 px-4 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold">{payingId===b.id?'...':'Pay UPI'}</button></div></div>))}</div>
             </div>
           </div>
         )}
@@ -353,27 +344,46 @@ export default function ResidentApp() {
               <h2 className="text-lg font-black">📝 Shikayat / Complaint</h2>
               <div className="text-xs opacity-70 mt-1">Light • Pani • Safai • Parking • Lift — photo ke saath bhejo</div>
               <div className="mt-2 flex gap-2 text-xs flex-wrap">
-                <span className="px-2 py-1 bg-amber-400 text-black rounded-full font-bold">{complaints.filter(c=>c.status==='pending').length} Pending</span>
-                <span className="px-2 py-1 bg-blue-400 text-white rounded-full font-bold">{complaints.filter(c=>c.status==='in_progress').length} Kaam chal raha</span>
+                <span className="px-2 py-1 bg-amber-400 text-black rounded-full font-bold">{complaints.filter(c=>c.status==='pending').length+empComps.filter(c=>c.status==='pending').length} Pending</span>
                 <span className="px-2 py-1 bg-emerald-400 text-black rounded-full font-bold">{complaints.filter(c=>c.status==='resolved'||c.status==='closed').length} Solved</span>
               </div>
             </div>
             <div className="mt-4 p-5 rounded-3xl bg-white border shadow-sm space-y-3">
-              <div className="text-sm font-black">➕ Nayi Shikayat</div>
-              <div className="grid grid-cols-3 gap-2">{categories.map(cat=>(<button key={cat} onClick={()=>setCCat(cat)} className={`h-10 rounded-full text-xs font-bold border ${cCat===cat?'bg-slate-900 text-white border-slate-900':'bg-slate-50'}`}>{cat}</button>))}</div>
+              <div className="text-sm font-black flex items-center gap-2"><span className="text-xl">+</span> Nayi Shikayat</div>
+              <div className="grid grid-cols-3 gap-2">
+                {categories.map(cat=>(
+                  <button key={cat} onClick={()=>setCCat(cat)} className={`h-12 rounded-full text-sm font-bold border ${cCat===cat?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200'}`}>{cat}</button>
+                ))}
+              </div>
+
+              {cCat==='Employee' && (
+                <div className="space-y-2">
+                  <select value={empCode} onChange={e=>setEmpCode(e.target.value)} className="w-full h-12 rounded-2xl bg-slate-50 border px-4 text-sm font-bold">
+                    <option value="">Employee Select Karo *</option>
+                    {empList.map((emp:any)=><option key={emp.employee_code} value={emp.employee_code}>{emp.employee_code} — {emp.name} ({emp.job_title})</option>)}
+                  </select>
+                  <div className="text- bg-amber-50 border border-amber-200 rounded-xl p-2">Ye complaint <b>admin/employees/complaints-verify</b> page par jayegi. Manager verify karega.</div>
+                </div>
+              )}
+
               <input value={cTitle} onChange={e=>setCTitle(e.target.value)} placeholder="Title * (jaise: Corridor light kharab)" className="w-full h-12 rounded-2xl bg-slate-50 border px-4 text-sm font-bold" />
               <textarea value={cDesc} onChange={e=>setCDesc(e.target.value)} placeholder="Detail likho..." rows={3} className="w-full rounded-2xl bg-slate-50 border px-4 py-3 text-sm" />
-              <label className="block p-4 rounded-2xl border-2 border-dashed border-slate-200 text-center cursor-pointer"><input type="file" accept="image/*" className="hidden" onChange={e=>setCPhoto(e.target.files?.[0]||null)} /><div className="text-2xl">📸</div><div className="text-xs font-bold mt-1">{cPhoto? cPhoto.name : 'Photo upload karo'}</div></label>
+              {cCat!=='Employee' && (
+                <label className="block p-4 rounded-2xl border-2 border-dashed border-slate-200 text-center cursor-pointer"><input type="file" accept="image/*" className="hidden" onChange={e=>setCPhoto(e.target.files?.[0]||null)} /><div className="text-2xl">📸</div><div className="text-xs font-bold mt-1">{cPhoto? cPhoto.name : 'Photo upload karo'}</div></label>
+              )}
               <button disabled={cUploading} onClick={handleComplaintSubmit} className="w-full h-12 rounded-full bg-red-600 text-white font-black text-sm">{cUploading?'Upload...':'🚨 Shikayat Bhejo'}</button>
             </div>
             <div className="mt-5"><div className="text-sm font-black">📋 Meri Shikayatein</div>
-              <div className="mt-2 space-y-3">{complaints.map(c=>(<div key={c.id} className="p-4 rounded-3xl bg-white border shadow-sm"><div className="flex justify-between items-start"><div><div className="font-bold text-sm">{c.category} • {c.title}</div><div className="text-xs opacity-60 mt-0.5">{new Date(c.created_at).toLocaleString()}</div></div><span className={`text-[10px] px-2 py-1 rounded-full font-black border ${statusColor(c.status)}`}>{c.status.toUpperCase()}</span></div>{c.photo_url && <img src={c.photo_url} className="mt-2 w-full h-40 object-cover rounded-2xl" />}{c.status==='resolved' && (<div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200"><div className="text-xs font-black text-emerald-700">🎉 Kaam ho gaya! Thank you bolo:</div><div className="mt-2 flex gap-1">{[1,2,3,4,5].map(s=>(<button key={s} onClick={()=>setCRating({...cRating, [c.id]:s})} className="text-xl">{(cRating[c.id]||5)>=s?'⭐':'☆'}</button>))}</div><input value={cFeedback[c.id]||''} onChange={e=>setCFeedback({...cFeedback, [c.id]:e.target.value})} placeholder="Dhanyavaad likho..." className="mt-2 w-full h-10 rounded-xl border px-3 text-xs" /><button onClick={()=>handleThankYou(c.id)} className="mt-2 w-full h-10 rounded-full bg-emerald-600 text-white text-xs font-black">🙏 Thank You Bhejo</button></div>)}{c.feedback && <div className="mt-2 p-2 rounded-xl bg-slate-50 text-xs">⭐ {c.rating}/5 — "{c.feedback}"</div>}</div>))}</div>
+              <div className="mt-2 space-y-3">
+                {complaints.map(c=>(<div key={c.id} className="p-4 rounded-3xl bg-white border shadow-sm"><div className="flex justify-between items-start"><div><div className="font-bold text-sm">{c.category} • {c.title}</div><div className="text-xs opacity-60 mt-0.5">{new Date(c.created_at).toLocaleString()}</div></div><span className={`text- px-2 py-1 rounded-full font-black border ${statusColor(c.status)}`}>{c.status.toUpperCase()}</span></div>{c.photo_url && <img src={c.photo_url} className="mt-2 w-full h-40 object-cover rounded-2xl" />}{c.status==='resolved' && (<div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200"><div className="text-xs font-black text-emerald-700">🎉 Kaam ho gaya! Thank you bolo:</div><div className="mt-2 flex gap-1">{[1,2,3,4,5].map(s=>(<button key={s} onClick={()=>setCRating({...cRating, [c.id]:s})} className="text-xl">{(cRating[c.id]||5)>=s?'⭐':'☆'}</button>))}</div><input value={cFeedback[c.id]||''} onChange={e=>setCFeedback({...cFeedback, [c.id]:e.target.value})} placeholder="Dhanyavaad likho..." className="mt-2 w-full h-10 rounded-xl border px-3 text-xs" /><button onClick={()=>handleThankYou(c.id)} className="mt-2 w-full h-10 rounded-full bg-emerald-600 text-white text-xs font-black">🙏 Thank You Bhejo</button></div>)}{c.feedback && <div className="mt-2 p-2 rounded-xl bg-slate-50 text-xs">⭐ {c.rating}/5 — "{c.feedback}"</div>}</div>))}
+                {empComps.map((c:any)=>(<div key={c.id} className="p-4 rounded-3xl bg-amber-50 border border-amber-200"><div className="flex justify-between"><div className="font-bold text-sm">👷 {c.employee_code} • Employee</div><span className={`text- px-2 py-1 rounded-full font-black ${c.status==='pending'?'bg-amber-100 text-amber-700':c.status==='verified'?'bg-red-100 text-red-700':'bg-slate-100'}`}>{c.status.toUpperCase()}{c.status==='verified'?` -₹${c.deduction_amount}`:''}</span></div><div className="text-xs mt-1">{c.description}</div><div className="text- opacity-50 mt-1">{new Date(c.created_at).toLocaleString()} • Admin Verify page par gayi</div></div>))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t rounded-t-3xl"><div className="max-w-md mx-auto grid grid-cols-5 gap-1 px-2 py-2">{[{id:'home',icon:'🏠',label:'Home'},{id:'visitors',icon:'👤',label:'Visitors'},{id:'book',icon:'🎭',label:'Book'},{id:'bills',icon:'💳',label:'Bills'},{id:'complaint',icon:'📝',label:'Shikayat'}].map(t=>(<button key={t.id} onClick={()=>setTab(t.id as any)} className={`h-14 rounded-2xl flex flex-col items-center justify-center ${tab===t.id?'bg-slate-900 text-white':'text-slate-400'}`}><span>{t.icon}</span><span className="text-[10px] mt-0.5 font-bold">{t.label}</span></button>))}</div></div>
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t rounded-t-3xl"><div className="max-w-md mx-auto grid grid-cols-5 gap-1 px-2 py-2">{[{id:'home',icon:'🏠',label:'Home'},{id:'visitors',icon:'👤',label:'Visitors'},{id:'book',icon:'🎭',label:'Book'},{id:'bills',icon:'💳',label:'Bills'},{id:'complaint',icon:'📝',label:'Shikayat'}].map(t=>(<button key={t.id} onClick={()=>setTab(t.id as any)} className={`h-14 rounded-2xl flex flex-col items-center justify-center ${tab===t.id?'bg-slate-900 text-white':'text-slate-400'}`}><span>{t.icon}</span><span className="text- mt-0.5 font-bold">{t.label}</span></button>))}</div></div>
     </div>
   )
 }
