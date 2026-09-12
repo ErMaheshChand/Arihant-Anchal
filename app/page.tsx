@@ -14,148 +14,61 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [emergencyAlert, setEmergencyAlert] = useState<any>(null)
 
-  useEffect(()=>{
-    const p=new URLSearchParams(window.location.search).get('flat')
-    if(p){ setFlatNo(p); setShowLoginModal(true) }
-  },[])
+  useEffect(()=>{ const p=new URLSearchParams(window.location.search).get('flat'); if(p){ setFlatNo(p); setShowLoginModal(true) } },[])
+  useEffect(()=>{ const ch=supabase.channel('emergency-home').on('postgres_changes',{event:'INSERT',schema:'public',table:'emergency_broadcasts'},payload=>{ const d=payload.new as any; if(d.target==='ALL'){ setEmergencyAlert(d); setTimeout(()=>setEmergencyAlert(null),30000)} }).subscribe(); return ()=>{supabase.removeChannel(ch)} },[])
 
-  useEffect(()=>{
-    const ch = supabase.channel('emergency-home')
-   .on('postgres_changes', {event:'INSERT', schema:'public', table:'emergency_broadcasts'}, payload=>{
-        const data = payload.new as any
-        if(data.target === 'ALL'){
-          setEmergencyAlert(data)
-          setTimeout(()=>setEmergencyAlert(null), 30000)
-        }
-      }).subscribe()
-    return ()=>{ supabase.removeChannel(ch) }
-  },[])
+  const go=(path:string)=>{ setShowResidentMenu(false); setShowLoginMenu(false); setShowGuardSub(false); window.location.href=path }
 
-  const handleLogin = async ()=>{
-    if(!flatNo||!password) return alert('Flat + Password bharo')
+  const handleLogin=async()=>{
+    if(!flatNo||!password) return alert('ID + Password bharo')
     setLoading(true)
-    const { data: ok } = await supabase.from('residents').select('*').eq('flat_no',flatNo.toUpperCase()).eq('password',password).eq('status','approved').maybeSingle()
-    if(ok){
-      localStorage.setItem('resident', JSON.stringify(ok));
-      if(ok.role === 'admin') window.location.href='/admin';
-      else window.location.href='/resident';
-      return
-    }
-    const { data: emp } = await supabase.from('employees').select('*').eq('employee_id',flatNo.toUpperCase()).eq('password',password).maybeSingle()
-    if(emp){
-      localStorage.setItem('employee', JSON.stringify(emp));
-      window.location.href='/employee';
-      return
-    }
-    setLoading(false)
-    const { data: anyData } = await supabase.from('residents').select('*').eq('flat_no',flatNo.toUpperCase()).maybeSingle()
-    if(!anyData) alert('❌ Registration nahi mila - Pehle Registration karo')
-    else if(anyData.password!==password) alert('❌ Password galat')
-    else if(anyData.status==='pending') alert(`⏳ Flat ${flatNo} approval pending hai`)
-    else alert('Login fail')
+    const {data:ok}=await supabase.from('residents').select('*').eq('flat_no',flatNo.toUpperCase()).eq('password',password).eq('status','approved').maybeSingle()
+    if(ok){ localStorage.setItem('resident',JSON.stringify(ok)); window.location.href=ok.role==='admin'?'/admin':'/resident'; return }
+    const {data:emp}=await supabase.from('employees').select('*').eq('employee_id',flatNo.toUpperCase()).eq('password',password).maybeSingle()
+    if(emp){ localStorage.setItem('employee',JSON.stringify(emp)); window.location.href='/employee'; return }
+    setLoading(false); alert('Login fail - approval check karo')
   }
 
-  const go = (path:string)=>{
-    setShowLoginMenu(false); setShowResidentMenu(false); setShowGuardSub(false)
-    window.location.href=path
-  }
-
-  const facilities = [
-    { icon: "🏊", title: "Swimming Pool", desc: "Olympic Size Pool with Kids Section", color: "from-cyan-100 to-blue-100" },
-    { icon: "🏋", title: "Gymnasium", desc: "Modern Equipment & Trainer Facility", color: "from-orange-100 to-red-100" },
-    { icon: "🏢", title: "Club House", desc: "Banquet Hall, Party & Events", color: "from-amber-100 to-yellow-100" },
-    { icon: "🌳", title: "Garden & Kids Park", desc: "Green Park, Play Area & Jogging", color: "from-green-100 to-emerald-100" },
-    { icon: "🛡", title: "24/7 Security", desc: "5 Gate Entry, CCTV & Guard Patrol", color: "from-slate-100 to-gray-100" },
-    { icon: "🅿", title: "Parking", desc: "Covered Parking for All Flats", color: "from-purple-100 to-pink-100" },
+  const facilities=[
+    {icon:"🏊",title:"Swimming Pool",desc:"Olympic Pool with Kids Section",color:"from-cyan-50 to-blue-50 border-cyan-100"},
+    {icon:"🏋",title:"Gymnasium",desc:"Modern Equipment & Trainer",color:"from-orange-50 to-red-50 border-orange-100"},
+    {icon:"🏢",title:"Club House",desc:"Banquet Hall & Events",color:"from-amber-50 to-yellow-50 border-amber-100"},
+    {icon:"🌳",title:"Garden Park",desc:"Green Park & Play Area",color:"from-green-50 to-emerald-50 border-green-100"},
+    {icon:"🛡",title:"24/7 Security",desc:"5 Gate CCTV & Guard",color:"from-slate-50 to-gray-50 border-slate-200"},
+    {icon:"🅿",title:"Parking",desc:"Covered Parking All Flats",color:"from-purple-50 to-pink-50 border-purple-100"},
   ]
 
-  const circleImages = [
-    { label: "Club House", icon: "🏢" },
-    { label: "Pool", icon: "🏊" },
-    { label: "Garden", icon: "🌳" },
-    { label: "Building", icon: "🏘" },
-    { label: "Gym", icon: "🏋" },
-    { label: "Security", icon: "🛡" },
-    { label: "Parking", icon: "🅿" },
-    { label: "Play Area", icon: "🎠" },
-  ]
+  const circleImages=[{label:"Club",icon:"🏢"},{label:"Pool",icon:"🏊"},{label:"Garden",icon:"🌳"},{label:"Tower",icon:"🏘"},{label:"Gym",icon:"🏋"},{label:"Security",icon:"🛡"},{label:"Parking",icon:"🅿"},{label:"Play",icon:"🎠"}]
 
   return (
-    <div className="min-h-screen bg-[#FFFBF2] text-[#1A1A1A] selection:bg-[#C6A25A]/20">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700;900&display=swap');
-       .font-serif{font-family:'Playfair Display',serif}
-       .font-sans{font-family:'Inter',sans-serif}
-        @keyframes rotateCircle { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-        @keyframes counterRotate { from { transform: rotate(0deg) } to { transform: rotate(-360deg) } }
-       .rotating-circle{ animation: rotateCircle 40s linear infinite; }
-       .rotating-circle:hover{ animation-play-state: paused; }
-       .counter-rotate{ animation: counterRotate 40s linear infinite; }
-       .rotating-circle:hover.counter-rotate{ animation-play-state: paused; }
-      `}</style>
+    <div className="min-h-screen bg-[#FFFBF2] text-[#1A1A1A]">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700&display=swap');.font-serif{font-family:'Playfair Display',serif} @keyframes rotateCircle{from{transform:rotate(0deg)}to{transform:rotate(360deg)}} @keyframes counterRotate{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}.rotating-circle{animation:rotateCircle 40s linear infinite}.counter-rotate{animation:counterRotate 40s linear infinite}`}</style>
 
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-2xl border-b border-black/[0.06] shadow-[0_4px_30px_rgba(0,0,0,0.04)]">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h- flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded- bg-gradient-to-br from-[#1A3C34] to-[#2A5A4A] flex items-center justify-center">
-              <span className="font-serif font-black text- text-[#C6A25A]">AA</span>
-            </div>
-            <div className="leading-none">
-              <div className="font-serif font-black text- text-[#122620]">Arihant Anchal</div>
-              <div className="text- tracking-[0.32em] text-[#C6A25A] uppercase font-bold mt-1">Society & Club House</div>
-            </div>
-          </div>
-          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-full bg-black/[0.04] border border-black/[0.06]">
-            <Link href="/" className="px-5 py-2 rounded-full bg-[#122620] text-white text-sm font-bold shadow">Home</Link>
-            <Link href="/about" className="px-5 py-2 rounded-full text-sm text-black/60 hover:text-black">About</Link>
-            <Link href="/amenities" className="px-5 py-2 rounded-full text-sm text-black/60 hover:text-black">Amenities</Link>
-            <Link href="/contact" className="px-5 py-2 rounded-full text-sm text-black/60 hover:text-black">Contact</Link>
-          </nav>
-          <div className="flex items-center gap-2.5">
-            {/* ====== FINAL 4 SUB TAB - NEW REGISTRATION ====== */}
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-black/5 h-">
+        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+          <div className="flex items-center gap-2.5"><div className="w-9 h-9 rounded-xl bg-[#122620] flex items-center justify-center text-[#C6A25A] font-black">AA</div><div><div className="font-serif font-black text-">Arihant Anchal</div><div className="text- tracking-widest text-[#C6A25A] font-bold uppercase">Society & Club House</div></div></div>
+          <div className="flex items-center gap-2">
+            {/* NEW REGISTRATION - LITE COLOR 4 TABS */}
             <div className="relative">
-              <button onClick={()=>{ setShowResidentMenu(!showResidentMenu); setShowLoginMenu(false) }} className="px-5 h-10 rounded-full bg-white border border-black/10 text-black text- font-bold flex items-center gap-1.5 shadow-sm">New Registration <span className="text-">{showResidentMenu?'▲':'▼'}</span></button>
+              <button onClick={()=>{setShowResidentMenu(!showResidentMenu);setShowLoginMenu(false)}} className="px-4 h-9 rounded-full bg-white border border-black/10 text- font-bold">New Registration ▼</button>
               {showResidentMenu && (
-                <div className="absolute top-12 right-0 w- bg-white border border-black/10 rounded- shadow-[0_20px_60px_rgba(0,0,0,0.12)] p-2 z-50">
-                  <div className="px-4 py-2 text- tracking-[0.2em] text-[#C6A25A] font-bold">SELECT REGISTRATION TYPE</div>
-
-                  <button onClick={()=>go('/resident/register')} className="w-full text-left px-4 py-3 rounded- hover:bg-black/[0.04] flex gap-3 transition border border-transparent hover:border-black/10">
-                    <div className="w-10 h-10 rounded-xl bg-[#122620] text-white flex items-center justify-center">🏠</div>
-                    <div className="flex-1"><div className="text-sm font-bold text-black">Resident</div><div className="text- text-black/50 break-all">/resident/register</div></div>
-                    <div className="text-black/20">→</div>
-                  </button>
-
-                  <button onClick={()=>go('/guard/register')} className="w-full text-left px-4 py-3 rounded- hover:bg-black/[0.04] flex gap-3 transition border border-transparent hover:border-black/10">
-                    <div className="w-10 h-10 rounded-xl bg-black/5 border border-black/10 flex items-center justify-center">🛡</div>
-                    <div className="flex-1"><div className="text-sm font-bold text-black">Guard</div><div className="text- text-black/50 break-all">/guard/register</div></div>
-                    <div className="text-black/20">→</div>
-                  </button>
-
-                  <button onClick={()=>go('/employee/register')} className="w-full text-left px-4 py-3 rounded- hover:bg-[#C6A25A]/10 flex gap-3 transition border border-transparent hover:border-[#C6A25A]/20">
-                    <div className="w-10 h-10 rounded-xl bg-[#C6A25A] text-white flex items-center justify-center">💼</div>
-                    <div className="flex-1"><div className="text-sm font-bold text-black">Employee</div><div className="text- text-black/50 break-all">/employee/register</div></div>
-                    <div className="text-black/20">→</div>
-                  </button>
-
-                  <button onClick={()=>go('/admin')} className="w-full text-left px-4 py-3 rounded- hover:bg-red-50 flex gap-3 transition border border-transparent hover:border-red-100">
-                    <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 border border-red-100 flex items-center justify-center">⚙</div>
-                    <div className="flex-1"><div className="text-sm font-bold text-black">Admin</div><div className="text- text-black/50">ID: ARI9700 - Direct Login</div></div>
-                    <div className="text-black/20">→</div>
-                  </button>
-
+                <div className="absolute top-11 right-0 w- bg-white border border-black/10 rounded- shadow-xl p-2 z-50">
+                  <button onClick={()=>go('/resident/register')} className="w-full text-left px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-100 hover:bg-blue-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center text-sm">🏠</div><span className="text- font-bold text-blue-900">Resident</span></button>
+                  <button onClick={()=>go('/guard/register')} className="w-full mt-1.5 text-left px-3 py-2.5 rounded-xl bg-teal-50 border border-teal-100 hover:bg-teal-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center text-sm">🛡</div><span className="text- font-bold text-teal-900">Guard</span></button>
+                  <button onClick={()=>go('/employee/register')} className="w-full mt-1.5 text-left px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100 hover:bg-amber-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center text-sm">💼</div><span className="text- font-bold text-amber-900">Employee</span></button>
+                  <button onClick={()=>go('/admin')} className="w-full mt-1.5 text-left px-3 py-2.5 rounded-xl bg-red-50 border border-red-100 hover:bg-red-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center text-sm">⚙</div><span className="text- font-bold text-red-700">Admin</span></button>
                 </div>
               )}
             </div>
-
+            {/* LOGIN - LITE COLOR */}
             <div className="relative">
-              <button onClick={()=>{ setShowLoginMenu(!showLoginMenu); setShowResidentMenu(false) }} className="px-5 h-10 rounded-full bg-[#122620] text-white text- font-black flex items-center gap-1.5">Login <span className="text-">{showLoginMenu?'▲':'▼'}</span></button>
+              <button onClick={()=>{setShowLoginMenu(!showLoginMenu);setShowResidentMenu(false)}} className="px-4 h-9 rounded-full bg-[#122620] text-white text- font-bold">Login ▼</button>
               {showLoginMenu && (
-                <div className="absolute top-12 right-0 w- bg-white border border-black/10 rounded- shadow-[0_20px_60px_rgba(0,0,0,0.12)] p-2 z-50">
-                  <div className="px-4 py-2 text- tracking-[0.2em] text-[#C6A25A] font-bold">SELECT PORTAL</div>
-                  <button onClick={()=>{ setShowLoginMenu(false); setLoginRole('resident'); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded- hover:bg-black/[0.04] flex gap-3"><div className="w-10 h-10 rounded-xl bg-[#122620] text-white flex items-center justify-center">👤</div><div><div className="text-sm font-bold text-black">Resident</div><div className="text- text-black/50">Flat No + Password</div></div></button>
-                  <button onClick={()=>{ setLoginRole('employee'); setShowLoginMenu(false); setShowLoginModal(true) }} className="w-full text-left px-4 py-3 rounded- hover:bg-black/[0.04] flex gap-3"><div className="w-10 h-10 rounded-xl bg-[#C6A25A] text-white flex items-center justify-center">💼</div><div><div className="text-sm font-bold text-black">Employee</div><div className="text- text-black/50">Staff Login</div></div></button>
-                  <div className="relative"><button onClick={()=>setShowGuardSub(!showGuardSub)} className="w-full text-left px-4 py-3 rounded- hover:bg-black/[0.04] flex gap-3"><div className="w-10 h-10 rounded-xl bg-black/5 border flex items-center justify-center">🛡</div><div className="flex-1"><div className="text-sm font-bold text-black">Guard</div><div className="text- text-black/50">Gate 1-5</div></div><span className="text-xs">{showGuardSub?'▲':'▼'}</span></button>{showGuardSub && (<div className="ml-4 mr-2 my-1 p-2 rounded-xl bg-black/[0.03] border border-black/10 grid grid-cols-3 gap-2">{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>go(`/guard/login?gate=${n}`)} className="h-9 rounded-full bg-white border border-black/10 hover:bg-[#122620] hover:text-white text- font-bold">Gate {n}</button>))}</div>)}</div>
-                  <button onClick={()=>go('/admin')} className="w-full text-left px-4 py-3 rounded- hover:bg-black/[0.04] flex gap-3"><div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 border border-red-100 flex items-center justify-center">⚙</div><div><div className="text-sm font-bold text-black">Admin</div><div className="text- text-black/50">ARI9700 / ARI#9700</div></div></button>
+                <div className="absolute top-11 right-0 w- bg-white border border-black/10 rounded- shadow-xl p-2 z-50">
+                  <button onClick={()=>{setShowLoginMenu(false);setLoginRole('resident');setShowLoginModal(true)}} className="w-full text-left px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center">👤</div><span className="text- font-bold">Resident</span></button>
+                  <button onClick={()=>{setLoginRole('employee');setShowLoginMenu(false);setShowLoginModal(true)}} className="w-full mt-1.5 text-left px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100 hover:bg-amber-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center">💼</div><span className="text- font-bold text-amber-900">Employee</span></button>
+                  <div className="relative mt-1.5"><button onClick={()=>setShowGuardSub(!showGuardSub)} className="w-full text-left px-3 py-2.5 rounded-xl bg-teal-50 border border-teal-100 hover:bg-teal-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center">🛡</div><span className="text- font-bold text-teal-900">Guard</span><span className="ml-auto text-">{showGuardSub?'▲':'▼'}</span></button>{showGuardSub && <div className="mt-1.5 p-2 rounded-xl bg-slate-50 border grid grid-cols-3 gap-1.5">{[1,2,3,4,5].map(n=><button key={n} onClick={()=>go(`/guard/login?gate=${n}`)} className="h-8 rounded-full bg-white border text- font-bold hover:bg-[#122620] hover:text-white">Gate {n}</button>)}</div>}</div>
+                  <button onClick={()=>go('/admin')} className="w-full mt-1.5 text-left px-3 py-2.5 rounded-xl bg-red-50 border border-red-100 hover:bg-red-100 flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center">⚙</div><span className="text- font-bold text-red-700">Admin</span></button>
                 </div>
               )}
             </div>
@@ -163,61 +76,30 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="relative pt-12 pb-20 px-6 overflow-hidden bg-[#FFFBF2]">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 items-center">
-          <div className="order-2 lg:order-1">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#122620] text-[#C6A25A] text- tracking-widest font-bold uppercase"><span className="w-2 h-2 rounded-full bg-[#C6A25A] animate-pulse"/> Jodhpur&apos;s Premium Living</div>
-            <h1 className="mt-6 font-serif font-black tracking-tight leading-[0.85]"><span className="block text-[#122620] text- md:text-">Arihant</span><span className="block text-[#122620] text- md:text- -mt-2">Anchal</span><span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#C6A25A] to-[#8B6F1F] text- md:text- mt-3 font-light italic">Society & Club House</span></h1>
-            <p className="mt-6 text- leading-7 text-black/60 max-w-xl">Jodhpur ki sabse advanced society management system — Resident, Guard, Employee aur Admin sab ek hi app me.</p>
-            <div className="mt-8 flex flex-wrap gap-3"><button onClick={()=>go('/resident/register')} className="h-12 px-8 rounded-full bg-[#122620] text-white font-bold text-sm">New Registration →</button><button onClick={()=>{ setLoginRole('resident'); setShowLoginModal(true) }} className="h-12 px-8 rounded-full bg-white border border-black/10 text-black font-bold text-sm">Login to Portal</button></div>
-          </div>
-          <div className="order-1 lg:order-2 relative flex items-center justify-center h-">
+      <section className="pt-10 pb-10 px-4">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-6 items-center">
+          <div><div className="inline-flex px-3 py-1 rounded-full bg-[#122620] text-[#C6A25A] text- font-bold tracking-widest">JODHPUR PREMIUM LIVING</div><h1 className="mt-4 font-serif font-black text- md:text- leading-[0.9] text-[#122620]">Arihant Anchal<br/><span className="text-[#C6A25A] italic font-light text- md:text-">Society & Club House</span></h1><p className="mt-3 text- text-black/50 max-w-md leading-6">Resident, Guard, Employee, Admin — sab ek hi portal me. Auto-adjust mobile view.</p><div className="mt-5 flex gap-2"><button onClick={()=>go('/resident/register')} className="h-10 px-5 rounded-full bg-[#122620] text-white text-xs font-bold">New Registration →</button><button onClick={()=>{setLoginRole('resident');setShowLoginModal(true)}} className="h-10 px-5 rounded-full bg-white border text-xs font-bold">Login</button></div></div>
+          <div className="relative flex items-center justify-center h- md:h-">
             <div className="absolute w- h- md:w- md:h- rounded-full border border-dashed border-[#C6A25A]/30"></div>
-            <div className="absolute w- h- md:w- md:h- rounded-full bg-white shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-black/[0.04] flex items-center justify-center">
-               <div className="text-center"><div className="w-20 h-20 mx-auto rounded-2xl bg-[#122620] flex items-center justify-center text-3xl">🏢</div><div className="font-serif font-black text-xl mt-4 text-[#122620]">Arihant<br/>Anchal</div></div>
-            </div>
-            <div className="absolute w- h- md:w- md:h- rotating-circle">
-              {circleImages.map((item, i)=>{
-                const angle = (i * 360) / circleImages.length;
-                return (<div key={i} className="absolute top-1/2 left-1/2 w-20 h-20 -ml-10 -mt-10" style={{ transform: `rotate(${angle}deg) translate(190px) rotate(-${angle}deg)` } as any}><div className="counter-rotate w-full h-full"><div className="w-20 h-20 rounded-2xl bg-white border border-black/10 shadow flex flex-col items-center justify-center"><div className="text-2xl">{item.icon}</div><div className="text- font-bold mt-1">{item.label}</div></div></div></div>)
-              })}
-            </div>
+            <div className="absolute w- h- rounded-full bg-white shadow-lg border flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 mx-auto rounded-xl bg-[#122620] flex items-center justify-center text-xl">🏢</div><div className="font-serif font-black text-sm mt-2">Arihant Anchal</div></div></div>
+            <div className="absolute w- h- md:w- md:h- rotating-circle">{circleImages.map((it,i)=>{const a=(i*360)/circleImages.length;return <div key={i} className="absolute top-1/2 left-1/2 w-14 h-14 -ml-7 -mt-7" style={{transform:`rotate(${a}deg) translate(150px) rotate(-${a}deg)`} as any}><div className="counter-rotate w-full h-full"><div className="w-14 h-14 rounded-xl bg-white border shadow flex flex-col items-center justify-center text-"><div className="text-lg">{it.icon}</div><div className="font-bold text-">{it.label}</div></div></div></div>})}</div>
           </div>
         </div>
       </section>
 
-      <footer className="bg-[#122620] text-white border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="grid md:grid-cols-4 gap-10">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-[#C6A25A] flex items-center justify-center font-black text-black">AA</div><div className="font-serif font-black text-lg">Arihant Anchal</div></div>
-              <p className="text-white/50 text-sm mt-4 max-w-sm">Jodhpur&apos;s most advanced digital society management system.</p>
-            </div>
-            <div><div className="text- tracking-widest text-[#C6A25A] font-bold uppercase">Quick Links</div><div className="mt-4 space-y-2.5 text-sm text-white/60"><div><Link href="/about">About</Link></div><div><Link href="/amenities">Amenities</Link></div></div></div>
-            <div><div className="text- tracking-widest text-[#C6A25A] font-bold uppercase">Support</div><div className="mt-4 space-y-2.5 text-sm text-white/60"><div>Gate 1: 24/7 Security</div><div>Admin Office: B-Block</div></div></div>
-          </div>
-          <div className="mt-10 pt-8 border-t border-white/10 flex flex-col md:flex-row gap-4 justify-between">
-            <div className="text- leading-6 text-white/70">
-              <div className="font-bold text-white">Designed by Er. Mahesh Chand</div>
-              <div>Address - B-2-304 Arihant Anchal, Jodhpur - 342005</div>
-              <div className="flex flex-wrap gap-4 mt-1"><span>Contact @ <a href="mailto:er.maheshchand.dd@gmail.com" className="text-[#C6A25A]">er.maheshchand.dd@gmail.com</a></span><span>Mobile No - <a href="tel:+918769909700" className="text-[#C6A25A]">8769909700</a></span></div>
-            </div>
-            <div className="text- text-white/30">© {new Date().getFullYear()} Arihant Anchal Society. All Rights Reserved.</div>
-          </div>
+      <section className="px-4 py-8 bg-white border-t">
+        <div className="max-w-7xl mx-auto"><div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">{facilities.map((f,i)=><div key={i} className={`rounded- border p-4 bg-gradient-to-br ${f.color}`}><div className="w-9 h-9 rounded-lg bg-white border flex items-center justify-center">{f.icon}</div><div className="font-bold text- mt-3 truncate">{f.title}</div><div className="text- text-black/50 mt-1 leading-4 line-clamp-2">{f.desc}</div></div>)}</div></div>
+      </section>
+
+      <footer className="bg-[#122620] text-white">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-2 text-">
+          <div className="text-white/70 text-center md:text-left leading-5"><span className="font-bold text-white">Designed by Er. Mahesh Chand</span> | B-2-304 Arihant Anchal, Jodhpur | <a href="mailto:er.maheshchand.dd@gmail.com" className="text-[#C6A25A]">er.maheshchand.dd@gmail.com</a> | <a href="tel:8769909700" className="text-[#C6A25A]">8769909700</a></div>
+          <div className="text-white/30">© {new Date().getFullYear()} Arihant Anchal</div>
         </div>
       </footer>
 
-      {showLoginModal && (
-        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded- p-7 shadow-xl">
-            <div className="flex justify-between items-center"><div className="font-bold text- text-black">🔐 {loginRole.toUpperCase()} Login</div><button onClick={()=>setShowLoginModal(false)} className="w-8 h-8 rounded-full bg-black/5">✕</button></div>
-            <div className="mt-6 space-y-3"><input value={flatNo} onChange={e=>setFlatNo(e.target.value.toUpperCase())} placeholder="Flat No / Employee ID" className="w-full h- rounded-2xl bg-black/[0.04] border border-black/10 px-4 font-bold text-sm text-black"/><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h- rounded-2xl bg-black/[0.04] border border-black/10 px-4 font-bold text-sm text-black"/><button onClick={handleLogin} disabled={loading} className="w-full h- rounded-full bg-[#122620] text-white font-black text-sm">{loading?'Checking...':'Login → Dashboard'}</button></div>
-          </div>
-        </div>
-      )}
-      {emergencyAlert && (
-        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"><div className="w-full max-w-md bg-white border-4 border-red-600 rounded- p-6"><div className="text-4xl text-center">🚨</div><h2 className="font-black text-2xl text-center text-red-600 mt-2">EMERGENCY ALERT</h2><div className="mt-4 p-4 bg-red-50 border-2 border-red-200 rounded-2xl font-bold text-center text-black text-sm">{emergencyAlert.message}</div><button onClick={()=>setEmergencyAlert(null)} className="mt-4 w-full h-12 bg-red-600 text-white rounded-full font-black">OK</button></div></div>
-      )}
+      {showLoginModal && <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white rounded- p-6"><div className="flex justify-between"><div className="font-bold text-sm">🔐 {loginRole.toUpperCase()} Login</div><button onClick={()=>setShowLoginModal(false)} className="w-7 h-7 rounded-full bg-black/5">✕</button></div><div className="mt-4 space-y-2.5"><input value={flatNo} onChange={e=>setFlatNo(e.target.value.toUpperCase())} placeholder="ID / Flat No" className="w-full h-11 rounded-xl bg-black/5 border px-3 text-sm font-bold"/><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full h-11 rounded-xl bg-black/5 border px-3 text-sm"/><button onClick={handleLogin} disabled={loading} className="w-full h-11 rounded-full bg-[#122620] text-white font-bold text-sm">{loading?'Checking...':'Login'}</button></div></div></div>}
+      {emergencyAlert && <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white border-4 border-red-600 rounded- p-5"><div className="text-3xl text-center">🚨</div><h2 className="font-black text-xl text-center text-red-600">EMERGENCY</h2><div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm font-bold text-center">{emergencyAlert.message}</div><button onClick={()=>setEmergencyAlert(null)} className="mt-3 w-full h-10 bg-red-600 text-white rounded-full font-bold">OK</button></div></div>}
     </div>
   )
 }
